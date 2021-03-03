@@ -47,7 +47,6 @@ class Objectron(Dataset):
         cropped_imgs = self.crop(image, unnormalized_keypoints, num_istances)
         # convert colors from BGR to RGB
         images = np.array([cv.cvtColor(image, cv.COLOR_BGR2RGB) for image in cropped_imgs])
-        images = cropped_imgs
         # given croped image and unnormalized key points: normilize it for cropped image
         bbox = self.normalize(cropped_imgs, unnormalized_keypoints)
 
@@ -56,39 +55,43 @@ class Objectron(Dataset):
                 bb, img = self.transform(img, bb)
 
         # [batch, channels, height, width]
-        ic(images.shape)
-        bbox = np.expand_dims(bbox, axis=0)
-        images = np.expand_dims(images, axis=0)
         image = np.transpose(images, (0, 3, 1, 2)).astype(np.float32)
         return (torch.tensor(image), torch.tensor(bbox), np.sum(num_istances))
 
     def unnormalize(self, image, normalized_keypoints):
         ''' transform image to global pixel values '''
-        keypoints = normalized_keypoints.reshape(-1, 3)
+        keypoints = [keypoint.reshape(-1, 3) for keypoint in normalized_keypoints]
         h, w, _ = image.shape
-        keypoints = np.multiply(keypoints, np.asarray([w, h, 1.], np.float32)).astype(int)
-        return keypoints[:,:2]
+        keypoints = np.array([ np.multiply(keypoint, np.asarray([w, h, 1.], np.float32)).astype(int)
+                        for keypoint in keypoints ])
+        return keypoints[:,:,:2]
 
     def crop(self, image, bbox, num_inctances):
         ''' fetch 2D bounding boxes from 3D and crop the image '''
         real_h, real_w, _ = image.shape
+        cropped_imgs = []
+        for obj in range(np.sum(num_inctances)):
+            x0 = self.clamp(min(bbox[obj,:,0]) - 5, 0, real_w)
+            y0 = self.clamp(min(bbox[obj,:,1]) - 5, 0, real_h)
+            x1 = self.clamp(max(bbox[obj,:,0]) + 5, 0, real_w)
+            y1 = self.clamp(max(bbox[obj,:,1]) + 5, 0, real_h)
 
-        x0 = self.clamp(min(bbox[:,0]) - 3, 0, real_w)
-        y0 = self.clamp(min(bbox[:,1]) - 3, 0, real_h)
-        x1 = self.clamp(max(bbox[:,0]) + 3, 0, real_w)
-        y1 = self.clamp(max(bbox[:,1]) + 3, 0, real_h)
+            crop_img = image[y0 : y1, x0 : x1]
+            cropped_imgs.append(crop_img)
+            cv.imwrite('./crop.jpg', crop_img)
+            cv.imwrite('before.jpg', image)
 
-        cropped_img = image[y0 : y1, x0 : x1]
-        # cv.imwrite('./crop.jpg', cropped_img)
-        # cv.imwrite('before.jpg', image)
-
-        return cropped_img
+        return np.asarray(cropped_imgs, np.float32)
 
     def normalize(self, image, unnormalized_keypoints):
         ''' normalize keypoints to image coordinates '''
-        h, w, _ = image.shape
-        keypoints = unnormalized_keypoints / np.asarray([w, h], np.float32)
-        return keypoints
+        objects, h, w, _ = image.shape
+        normalized_keypoints = []
+        for obj in range(objects):
+            keypoints = unnormalized_keypoints[obj] / np.asarray([w, h], np.float32)
+            normalized_keypoints.append(keypoints)
+
+        return np.asarray(normalized_keypoints, np.float32)
 
     def fetch_ann(self, root):
         ann_path = list(map(lambda x: root / x,
@@ -106,7 +109,7 @@ def test_dataset():
     root = '/home/prokofiev/3D-object-recognition/data'
     ds = Objectron(root)
     ic(len(ds))
-    img_tensor, bbox, num_samples = ds[3]
+    img_tensor, bbox, num_samples = ds[122867]
     ic(img_tensor.shape)
     ic(bbox)
     ic(bbox.shape[0])
