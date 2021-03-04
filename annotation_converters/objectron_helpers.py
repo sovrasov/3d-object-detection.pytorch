@@ -62,16 +62,16 @@ def get_frame_annotation(sequence, frame_id):
           (keypoint.point_3d.x, keypoint.point_3d.y, keypoint.point_3d.z))
     num_keypoints_per_object.append(num_keypoints)
     object_id += 1
-  return (object_keypoints_2d, object_categories, keypoint_size_list,
-          annotation_types)
+  return [object_keypoints_2d, object_categories, keypoint_size_list,
+          annotation_types]
 
 
-def get_video_frames_name(video_file):
+def get_video_frames_number(video_file):
   capture = cv2.VideoCapture(video_file)
   return int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
 
 
-def grab_frame(video_file, frame_ids, use_opencv=True):
+def grab_frames(video_file, frame_ids, use_opencv=True):
   """Grab an image frame from the video file."""
   frames = []
   capture = cv2.VideoCapture(video_file)
@@ -103,18 +103,12 @@ def grab_frame(video_file, frame_ids, use_opencv=True):
 
   return frames
 
-
-annotation_file = sys.argv[1]#'.../annotations/class/batch-i/j.pbdata'
-video_filename = sys.argv[2]#'.../videos/class/batch-i/j/video.MOV'
-
-
-frames_ids = [i for i in range(get_video_frames_name(video_filename))]
-with open(annotation_file, 'rb') as pb:
-    sequence = annotation_protocol.Sequence()
-    sequence.ParseFromString(pb.read())
-    frames = grab_frame(video_filename, frames_ids)
-    for frame_id in frames_ids:
-      annotation, cat, num_keypoints, types = get_frame_annotation(sequence, frame_id)
-      image = graphics.draw_annotation_on_image(frames[frame_id], annotation, num_keypoints)
-      cv2.imshow('bbxo view', cv2.resize(image, (224, 224)))
-      cv2.waitKey(10)
+def load_annotation_sequence(annotation_file):
+  frame_annotations = []
+  with open(annotation_file, 'rb') as pb:
+      sequence = annotation_protocol.Sequence()
+      sequence.ParseFromString(pb.read())
+      for i in range(len(sequence.frame_annotations)):
+        frame_annotations.append(get_frame_annotation(sequence, i))
+       # annotation, cat, num_keypoints, types
+  return frame_annotations
