@@ -161,6 +161,7 @@ def main():
     parser.add_argument('--obj_classes', type=list, default=['cereal_box'], help='Classes to convert')
     parser.add_argument('--fps_divisor', type=int, default=1, help='')
     parser.add_argument('--res_divisor', type=int, default=1, help='')
+    parser.add_argument('--only_annotation', action='store_true')
     args = parser.parse_args()
 
     subsets = ['train', 'test']
@@ -172,7 +173,8 @@ def main():
 
     for k in data_info.keys():
         print('Converting ' + k)
-        save_2_coco(args.output_folder, k, data_info[k], args.obj_classes, args.fps_divisor, args.res_divisor, True)
+        save_2_coco(args.output_folder, k, data_info[k], args.obj_classes,
+                    args.fps_divisor, args.res_divisor, not args.only_annotation)
 
 
 if __name__ == '__main__':
