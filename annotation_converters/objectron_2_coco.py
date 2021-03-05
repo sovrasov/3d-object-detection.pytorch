@@ -82,6 +82,7 @@ def save_2_coco(output_root, subset_name, data_info, obj_classes, fps_divisor, r
     img_id = 0
     ann_id = 0
 
+    stat = {'Total frames' : 0, 'Avg box size': [0, 0], 'Total boxes': 0}
     ann_dict = {}
     categories = [{"id": i + 1, "name": cl} for i, cl in enumerate(obj_classes)]
     class_2_id = {cl : i + 1 for i, cl in enumerate(obj_classes)}
@@ -99,6 +100,9 @@ def save_2_coco(output_root, subset_name, data_info, obj_classes, fps_divisor, r
 
         for frame_idx, frame_ann in enumerate(annotation):
             if frame_idx not in frames:
+                continue
+            if frames[frame_idx] is None:
+                print('Warning: missing frame in ' + vid_path)
                 continue
             #object_keypoints_2d, object_categories, keypoint_size_list, annotation_types
 
@@ -118,6 +122,7 @@ def save_2_coco(output_root, subset_name, data_info, obj_classes, fps_divisor, r
             image_info['file_name'] = osp.join('images',
                     vid_path[vid_name_idx : vid_path.rfind(osp.sep)].replace(osp.sep, '_') + '_' + str(frame_idx) + '.jpg')
             images_info.append(image_info)
+            stat['Total frames'] += 1
 
             '''
             #visual debug
@@ -135,6 +140,9 @@ def save_2_coco(output_root, subset_name, data_info, obj_classes, fps_divisor, r
 
             for i in range(num_objects):
                 if bboxes[i] is not None:
+                    stat['Total boxes'] += 1
+                    stat['Avg box size'][0] += bboxes[i][2]
+                    stat['Avg box size'][1] += bboxes[i][3]
                     ann = {
                         'id': ann_id,
                         'image_id': image_info['id'],
@@ -154,6 +162,9 @@ def save_2_coco(output_root, subset_name, data_info, obj_classes, fps_divisor, r
     ann_dict['annotations'] = annotations
     with open(osp.join(ann_folder, json_name), 'w') as f:
         f.write(json.dumps(ann_dict, default=np_encoder))
+    stat['Avg box size'][0] /= stat['Total boxes']
+    stat['Avg box size'][1] /= stat['Total boxes']
+    return stat
 
 
 def main():
@@ -177,8 +188,10 @@ def main():
 
     for k in data_info.keys():
         print('Converting ' + k)
-        save_2_coco(args.output_folder, k, data_info[k], args.obj_classes,
-                    args.fps_divisor, args.res_divisor, not args.only_annotation)
+        stat = save_2_coco(args.output_folder, k, data_info[k], args.obj_classes,
+                           args.fps_divisor, args.res_divisor, not args.only_annotation)
+        for k in stat:
+            print(f'{k}: {stat[k]}')
 
 
 if __name__ == '__main__':
