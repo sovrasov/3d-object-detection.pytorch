@@ -120,7 +120,7 @@ def save_2_coco(output_root, subset_name, data_info, obj_classes, fps_divisor, r
             images_info.append(image_info)
             vid_name_idx = vid_path.find('batch-')
             image_info['file_name'] = osp.join('images',
-                    vid_path[vid_name_idx : vid_path.rfind(osp.sep)].replace(osp.sep, '_') + '_' + str(frame_idx) + '.jpg')
+                    frame_ann[1] + '_' + vid_path[vid_name_idx : vid_path.rfind(osp.sep)].replace(osp.sep, '_') + '_' + str(frame_idx) + '.jpg')
             images_info.append(image_info)
             stat['Total frames'] += 1
 
