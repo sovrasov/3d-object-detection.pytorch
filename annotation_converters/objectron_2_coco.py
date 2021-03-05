@@ -26,7 +26,7 @@ def load_video_info(data_root, subset, classes):
                 avg_vid_len += len(ann)
                 vid_path = osp.join(data_root, 'videos' + osp.sep + line.strip() + osp.sep + 'video.MOV')
                 videos_info.append((vid_path, ann))
-                break
+
     avg_vid_len /= len(videos_info)
     return videos_info, avg_vid_len
 
