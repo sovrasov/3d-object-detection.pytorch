@@ -84,7 +84,7 @@ def save_2_coco(output_root, subset_name, data_info, obj_classes, fps_divisor, r
 
     ann_dict = {}
     categories = [{"id": i + 1, "name": cl} for i, cl in enumerate(obj_classes)]
-    class_2_id = {cl : i for i, cl in enumerate(obj_classes)}
+    class_2_id = {cl : i + 1 for i, cl in enumerate(obj_classes)}
     images_info = []
     annotations = []
 
