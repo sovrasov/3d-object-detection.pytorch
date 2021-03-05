@@ -73,7 +73,7 @@ def get_video_frames_number(video_file):
 
 def grab_frames(video_file, frame_ids, use_opencv=True):
   """Grab an image frame from the video file."""
-  frames = []
+  frames = {}
   capture = cv2.VideoCapture(video_file)
   height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
   width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -83,7 +83,7 @@ def grab_frames(video_file, frame_ids, use_opencv=True):
     for frame_id in frame_ids:
       capture.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
       ret, current_frame = capture.read()
-      frames.append(current_frame)
+      frames[frame_id] = current_frame
     capture.release()
   else:
     frame_size = width * height * 3
@@ -99,7 +99,7 @@ def grab_frames(video_file, frame_ids, use_opencv=True):
       current_frame = np.frombuffer(
           pipe.stdout.read(frame_size), dtype='uint8').reshape(height, width, 3)
       pipe.stdout.flush()
-      frames.append(cv2.cvtColor(current_frame, cv2.COLOR_BGR2RGB))
+      frames[frame_id] = cv2.cvtColor(current_frame, cv2.COLOR_BGR2RGB)
 
   return frames
 

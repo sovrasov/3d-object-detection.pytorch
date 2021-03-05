@@ -91,10 +91,14 @@ def save_2_coco(output_root, subset_name, data_info, obj_classes, fps_divisor, r
     for item in tqdm(data_info):
         vid_path, annotation = item
         # assert get_video_frames_number(vid_path) == len(annotation)
-        frames = grab_frames(vid_path, list(range(len(annotation))))
+        req_frames = []
+        for frame_idx in range(len(annotation)):
+            if frame_idx % fps_divisor == 0:
+                req_frames.append(frame_idx)
+        frames = grab_frames(vid_path, req_frames)
 
         for frame_idx, frame_ann in enumerate(annotation):
-            if frame_idx % fps_divisor != 0:
+            if frame_idx not in frames:
                 continue
             #object_keypoints_2d, object_categories, keypoint_size_list, annotation_types
 
