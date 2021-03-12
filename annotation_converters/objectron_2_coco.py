@@ -58,7 +58,7 @@ def get_bboxes_from_keypoints(keypoints, num_objects, size):
         max_x = np.max(keypoints[i][:,0])
         max_y = np.max(keypoints[i][:,1])
         bbox = [min_x, min_y, max_x - min_x, max_y - min_y]
-        if min_x < 0 or min_y < 0 or max_x >= w or max_y >= h and bbox[2]*bbox[3] == 0:
+        if min_x < 0 or min_y < 0 or max_x >= w or max_y >= h or bbox[2]*bbox[3] == 0:
             bboxes.append(None)
         else:
             bboxes.append(bbox)
@@ -120,7 +120,7 @@ def save_2_coco(output_root, subset_name, data_info, obj_classes, fps_divisor, r
             images_info.append(image_info)
             vid_name_idx = vid_path.find('batch-')
             image_info['file_name'] = osp.join('images',
-                    vid_path[vid_name_idx : vid_path.rfind(osp.sep)].replace(osp.sep, '_') + '_' + str(frame_idx) + '.jpg')
+                    frame_ann[1] + '_' + vid_path[vid_name_idx : vid_path.rfind(osp.sep)].replace(osp.sep, '_') + '_' + str(frame_idx) + '.jpg')
             images_info.append(image_info)
             stat['Total frames'] += 1
 
