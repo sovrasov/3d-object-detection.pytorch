@@ -10,7 +10,7 @@ import numpy as np
 from google.protobuf import text_format
 
 import sys
-module_path = os.path.abspath(os.path.join('3rdparty/Objectron'))
+module_path = os.path.abspath(os.path.join('/home/prokofiev/3D-object-recognition/3rdparty/Objectron'))
 if module_path not in sys.path:
     sys.path.append(module_path)
 

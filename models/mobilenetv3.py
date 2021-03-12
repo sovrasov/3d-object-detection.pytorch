@@ -154,8 +154,9 @@ class MobileNetV3(nn.Module):
             nn.Linear(exp_size, output_channel),
             h_swish(),
             nn.Dropout(0.2),
-            nn.Linear(output_channel, num_points, bias=False),
+            nn.Linear(output_channel, num_points),
         )
+        self.sigmoid = nn.Sigmoid()
         self._initialize_weights()
 
     def forward(self, x):
@@ -164,6 +165,7 @@ class MobileNetV3(nn.Module):
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
         x = self.classifier(x)
+        x = self.sigmoid(x)
         return x.view(x.shape[0],9,2)
 
     def _initialize_weights(self):

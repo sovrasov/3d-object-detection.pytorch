@@ -40,34 +40,31 @@ class Objectron(Dataset):
         # get raw key points for bb from annotations
         raw_keypoints = self.ann[str(indx)]['point_2d']
         # get num instatnces from annotations for current image
-        num_istances = self.ann[str(indx)]['instance_num']
+        num_instances = np.sum(self.ann[str(indx)]['instance_num'])
         # read image
         image = cv.imread(str(img_path), flags=1)
         assert image is not None
         # The keypoints are [x, y, d] where `x` and `y` are normalized
         # and `d` is the metric distance from the center of the camera.
         # transform raw key points to this representation
-        normalized_keypoints = np.array(raw_keypoints).reshape(np.sum(num_istances), 9, 3)
+        normalized_keypoints = np.array(raw_keypoints).reshape(num_instances, 9, 3)
+        num_instances, normalized_keypoints = self.filter_noise(normalized_keypoints)
+        if num_instances == 0:
+            return None, None, None
+        normalized_keypoints = normalized_keypoints.reshape(num_instances, 9, 2)
         # "print" image after crop with keypoints if needed
         if self.debug_mode:
             imgh = image.copy()
             for obj in range(normalized_keypoints.shape[0]):
-                graphics.draw_annotation_on_image(imgh, normalized_keypoints[obj] , [9])
+                b = np.zeros((9,3))
+                b[:,:2] = normalized_keypoints[obj]
+                graphics.draw_annotation_on_image(imgh, b , [9])
             cv.imwrite('image_before_pipeline.jpg', imgh)
-        # batch_keypoints = np.split(prefetched_bbox, np.array(np.cumsum(num_istances)))[0]
+        # batch_keypoints = np.split(prefetched_bbox, np.array(num_instances)))[0]
         # unnormilize keypoints to global representation
         unnormalized_keypoints = self.unnormalize(image, normalized_keypoints)
         # given unnormalized keypoints crop object on image
-        cropped_keypoints, cropped_imgs = self.crop(image, unnormalized_keypoints, num_istances)
-
-        # "print" image after crop with keypoints if needed
-        if self.debug_mode:
-            stacked = [np.zeros((9, 3)) for kp in cropped_keypoints]
-            norm_kp = self.normalize(cropped_imgs, cropped_keypoints)
-            for obj in range(len(cropped_imgs)):
-                stacked[obj][:,:-1] = norm_kp[obj]
-                graphics.draw_annotation_on_image(cropped_imgs[obj], stacked[obj] , [9])
-                cv.imwrite(f'cropped_with_ann_{obj}.jpg', cropped_imgs[obj])
+        cropped_keypoints, cropped_imgs = self.crop(image, unnormalized_keypoints, num_instances)
 
         # convert colors from BGR to RGB
         images = [cv.cvtColor(image, cv.COLOR_BGR2RGB) for image in cropped_imgs]
@@ -84,16 +81,24 @@ class Objectron(Dataset):
             transformed_images, transformed_bbox = images, cropped_keypoints
         # given croped image and unnormalized key points: normilize it for cropped image
         transformed_bbox = self.normalize(transformed_images, transformed_bbox)
+        # "print" image after crop with keypoints if needed
+        if self.debug_mode:
+            for obj in range(len(transformed_bbox)):
+                b = np.zeros((9,3))
+                b[:,:2] = transformed_bbox[obj]
+                graphics.draw_annotation_on_image(transformed_images[obj], b , [9])
+                cv.imwrite(f'cropped_with_ann_{obj}.jpg', cv.cvtColor(transformed_images[obj], cv.COLOR_RGB2BGR))
+
         # [batch, channels, height, width]
-        return (transformed_images, transformed_bbox, np.sum(num_istances))
+        return (transformed_images, transformed_bbox, num_instances)
 
     def unnormalize(self, image, normalized_keypoints):
         ''' transform image to global pixel values '''
-        keypoints = [keypoint.reshape(-1, 3) for keypoint in normalized_keypoints]
+        keypoints = [keypoint.reshape(-1, 2) for keypoint in normalized_keypoints]
         h, w, _ = image.shape
-        keypoints = np.array([ np.multiply(keypoint, np.asarray([w, h, 1.], np.float32)).astype(int)
+        keypoints = np.array([ np.multiply(keypoint, np.asarray([w, h], np.float32)).astype(int)
                         for keypoint in keypoints ])
-        return keypoints[:,:,:2]
+        return keypoints
 
     def crop(self, image, bbox, num_inctances):
         ''' fetch 2D bounding boxes from 3D and crop the image '''
@@ -101,7 +106,7 @@ class Objectron(Dataset):
         cropped_imgs = []
         cropped_bbox = []
 
-        for obj in range(np.sum(num_inctances)):
+        for obj in range(num_inctances):
             # clamp bbox coordinates according to image shape
             clipped_bb = self.clip_bb(bbox[obj], real_w, real_h)
             # crop 2D bounding box from image by given 3D keypoints
@@ -146,6 +151,23 @@ class Objectron(Dataset):
         with open(ann_path[0], 'r') as f:
             self.ann = json.load(f)
 
+    def filter_noise(self, kp):
+        kp = np.unique(kp, axis=0) # filter duplicates
+        filtered = []
+        broken = False
+        for id, obj in enumerate(kp):
+            obj_copy, inverse, counts = np.unique(obj[:,:2], axis=0, return_counts=True, return_inverse=True)
+            if len(counts) == 9:
+                filtered.append(obj_copy[inverse])
+            else:
+                filtered.append(None)
+
+        for object_ in filtered:
+            if object_ is None:
+                filtered.remove(object_)
+
+        return len(filtered), np.asarray(filtered, np.float32)
+
     def clip_bb(self, bbox, w, h):
         ''' clip offset bbox coordinates
         bbox: np.array, shape: [9,2], repr: [x,y]'''
@@ -179,8 +201,10 @@ def correct_bbox():
 
 def collate(batch):
     imgs = np.array([np.transpose(np.array(img), (2,0,1)).astype(np.float32)
-                        for batch_inctances in batch for img in batch_inctances[0]])
-    bbox = np.array([kp for batch_inctances in batch for kp in batch_inctances[1]])
+                        for batch_inctances in batch for img in batch_inctances[0] if img is not None], dtype=np.float32)
+    bbox = np.array([np.asarray(kp, np.float32) for batch_inctances in batch for kp in batch_inctances[1] if kp is not None], dtype=np.float32)
+    if imgs.size == 0 or bbox.size == 0:
+        return None, None
 
     return torch.from_numpy(imgs), torch.from_numpy(bbox)
 
@@ -208,9 +232,9 @@ def test():
                             A.RandomBrightnessContrast(p=0.2),
                           ], keypoint_params=A.KeypointParams(format='xy'))
 
-    super_vision_test(root, mode='train', transform=transform, index=21)
-    # dataset_test(root, mode='val', transform=transform, batch_size=256)
-    # dataset_test(root, mode='train', transform=transform, batch_size=256)
+    super_vision_test(root, mode='val', transform=transform, index=555)
+    dataset_test(root, mode='val', transform=transform, batch_size=256)
+    dataset_test(root, mode='train', transform=transform, batch_size=256)
 
 if __name__ == '__main__':
     test()
