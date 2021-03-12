@@ -58,7 +58,7 @@ def get_bboxes_from_keypoints(keypoints, num_objects, size):
         max_x = np.max(keypoints[i][:,0])
         max_y = np.max(keypoints[i][:,1])
         bbox = [min_x, min_y, max_x - min_x, max_y - min_y]
-        if min_x < 0 or min_y < 0 or max_x >= w or max_y >= h and bbox[2]*bbox[3] == 0:
+        if min_x < 0 or min_y < 0 or max_x >= w or max_y >= h or bbox[2]*bbox[3] == 0:
             bboxes.append(None)
         else:
             bboxes.append(bbox)
