@@ -117,7 +117,6 @@ def save_2_coco(output_root, subset_name, data_info, obj_classes, fps_divisor, r
             image_info['id'] = img_id
             img_id += 1
             image_info['height'], image_info['width'] = h, w
-            images_info.append(image_info)
             vid_name_idx = vid_path.find('batch-')
             image_info['file_name'] = osp.join('images',
                     frame_ann[1] + '_' + vid_path[vid_name_idx : vid_path.rfind(osp.sep)].replace(osp.sep, '_') + '_' + str(frame_idx) + '.jpg')
