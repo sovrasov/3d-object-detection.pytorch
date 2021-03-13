@@ -12,6 +12,9 @@ from objectron_helpers import load_annotation_sequence, grab_frames, get_video_f
 lists_root_path = osp.abspath(os.path.join(osp.dirname(__file__), '../3rdparty/Objectron/index'))
 
 
+ALL_CLASSES = ['bike', 'book', 'bottle', 'cereal_box', 'camera', 'chair', 'cup', 'laptop', 'shoe']
+
+
 def load_video_info(data_root, subset, classes):
     videos_info = []
     avg_vid_len = 0
@@ -172,15 +175,22 @@ def main():
                         help='path to objectron raw data root', required=True)
     parser.add_argument('--output_folder', type=str, default='',
                         help='path to output folder with COCO annotation', required=True)
-    parser.add_argument('--obj_classes', type=list, default=['cereal_box'], help='Classes to convert')
+    parser.add_argument('--obj_classes', type=str, nargs='+', default='cereal_box', help='Classes to convert')
     parser.add_argument('--fps_divisor', type=int, default=1, help='')
     parser.add_argument('--res_divisor', type=int, default=1, help='')
     parser.add_argument('--only_annotation', action='store_true')
     args = parser.parse_args()
 
+    if args.obj_classes[0] == 'all':
+        args.obj_classes = ALL_CLASSES
+
+    for cl in args.obj_classes:
+        assert cl in ALL_CLASSES
+
     subsets = ['train', 'test']
     data_info = {}
     for subset in subsets:
+        print(f'Loadning {subset} metadata...')
         videos_info, avg_len = load_video_info(args.data_root, subset, args.obj_classes)
         print(f'# of {subset} videos: {len(videos_info)}, avg lenght: {avg_len}')
         data_info[subset] = videos_info
