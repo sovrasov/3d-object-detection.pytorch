@@ -50,7 +50,7 @@ def decode_keypoints(keypoints, keypoint_size_list, size):
     return keypoints
 
 
-def get_bboxes_from_keypoints(keypoints, num_objects, size):
+def get_bboxes_from_keypoints(keypoints, num_objects, size, clip_bboxes=False):
     w, h = size
     bboxes = []
     num_valid = 0
@@ -60,6 +60,9 @@ def get_bboxes_from_keypoints(keypoints, num_objects, size):
         min_y = np.min(keypoints[i][:,1])
         max_x = np.max(keypoints[i][:,0])
         max_y = np.max(keypoints[i][:,1])
+        if clip_bboxes:
+            min_x, min_y = max(0, min_x), max(0, min_y)
+            max_x, max_y = min(w - 1, max_x), min(h - 1, max_y)
         bbox = [min_x, min_y, max_x - min_x, max_y - min_y]
         if min_x < 0 or min_y < 0 or max_x >= w or max_y >= h or bbox[2]*bbox[3] == 0:
             bboxes.append(None)
@@ -73,7 +76,8 @@ def get_bboxes_from_keypoints(keypoints, num_objects, size):
     return None
 
 
-def save_2_coco(output_root, subset_name, data_info, obj_classes, fps_divisor, res_divisor, dump_images=False):
+def save_2_coco(output_root, subset_name, data_info, obj_classes, fps_divisor,
+                res_divisor, dump_images=False, clip_classes=[]):
     json_name = f'objectron_{subset_name}.json'
     ann_folder = osp.join(output_root, 'annotations')
     img_folder = osp.join(output_root, 'images')
@@ -112,7 +116,8 @@ def save_2_coco(output_root, subset_name, data_info, obj_classes, fps_divisor, r
             h, w = frames[frame_idx].shape[0] // res_divisor, frames[frame_idx].shape[1] // res_divisor
             keypoints = decode_keypoints(frame_ann[0], frame_ann[2], (w, h))
             num_objects = len(frame_ann[2])
-            bboxes = get_bboxes_from_keypoints(keypoints, num_objects, (w, h))
+            bboxes = get_bboxes_from_keypoints(keypoints, num_objects, (w, h),
+                                               clip_bboxes=True if frame_ann[1] in clip_classes else False)
             if bboxes is None:
                 continue
 
@@ -130,9 +135,12 @@ def save_2_coco(output_root, subset_name, data_info, obj_classes, fps_divisor, r
             #visual debug
             frames[frame_idx] = cv.resize(frames[frame_idx], (w, h))
             for kp_pixel in keypoints[0]:
-                cv.circle(frames[frame_idx], (kp_pixel[0], kp_pixel[1]), 10, (255, 0, 0), -1)
+                cv.circle(frames[frame_idx], (kp_pixel[0], kp_pixel[1]), 5, (255, 0, 0), -1)
+            for kp_pixel in keypoints[1]:
+                cv.circle(frames[frame_idx], (kp_pixel[0], kp_pixel[1]), 5, (0, 0, 255), -1)
             for bbox in bboxes:
-                cv.rectangle(frames[frame_idx], (bbox[0], bbox[1]), (bbox[0] + bbox[2], bbox[1] + bbox[3]), (0, 0, 255), 1)
+                if bbox is not None:
+                    cv.rectangle(frames[frame_idx], (bbox[0], bbox[1]), (bbox[0] + bbox[2], bbox[1] + bbox[3]), (0, 0, 255), 1)
             cv.imwrite(osp.join(output_root, image_info['file_name']), frames[frame_idx])
             '''
 
@@ -198,7 +206,7 @@ def main():
     for k in data_info.keys():
         print('Converting ' + k)
         stat = save_2_coco(args.output_folder, k, data_info[k], args.obj_classes,
-                           args.fps_divisor, args.res_divisor, not args.only_annotation)
+                           args.fps_divisor, args.res_divisor, not args.only_annotation, ['shoe'])
         for k in stat:
             print(f'{k}: {stat[k]}')
 
