@@ -13,6 +13,7 @@ lists_root_path = osp.abspath(os.path.join(osp.dirname(__file__), '../3rdparty/O
 
 
 ALL_CLASSES = ['bike', 'book', 'bottle', 'cereal_box', 'camera', 'chair', 'cup', 'laptop', 'shoe']
+OBJECTRON_NUM_KPS = 9
 
 
 def load_video_info(data_root, subset, classes):
@@ -47,6 +48,9 @@ def decode_keypoints(keypoints, keypoint_size_list, size):
         np.multiply(keypoint, unwrap_mat).astype(int)[:, :-1]
             for keypoint in keypoints
     ][:len(keypoint_size_list)]
+    for i, kp in enumerate(keypoints):
+        assert len(kp) == keypoint_size_list[i]
+        assert len(kp) == OBJECTRON_NUM_KPS
     return keypoints
 
 
