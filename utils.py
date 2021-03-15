@@ -1,14 +1,16 @@
 import pickle
+import sys
 from collections import OrderedDict
 import os.path as osp
 from functools import partial
+from importlib import import_module
 
 import numpy as np
-from icecream import ic
 import torch
 import warnings
 import torch
 import torch.nn as nn
+from attrdict import AttrDict as adict
 
 def check_isfile(fpath):
     """Checks if the given path is a file.
@@ -23,6 +25,26 @@ def check_isfile(fpath):
     if not isfile:
         warnings.warn('No file found at "{}"'.format(fpath))
     return isfile
+
+def read_py_config(filename):
+    filename = osp.abspath(osp.expanduser(filename))
+    if not check_isfile(filename):
+        raise RuntimeError("config not found")
+    assert filename.endswith('.py')
+    module_name = osp.basename(filename)[:-3]
+    if '.' in module_name:
+        raise ValueError('Dots are not allowed in config file path.')
+    config_dir = osp.dirname(filename)
+    sys.path.insert(0, config_dir)
+    mod = import_module(module_name)
+    sys.path.pop(0)
+    cfg_dict = adict({
+        name: value
+        for name, value in mod.__dict__.items()
+        if not name.startswith('__')
+    })
+
+    return cfg_dict
 
 def collate(batch):
     imgs = np.array([np.transpose(np.array(img), (2,0,1)).astype(np.float32)

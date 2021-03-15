@@ -128,7 +128,7 @@ class InvertedResidual(nn.Module):
 
 
 class MobileNetV3(nn.Module):
-    def __init__(self, cfgs, mode, num_points=18, width_mult=1.):
+    def __init__(self, cfgs, mode, num_points=18, num_classes=9, width_mult=1.):
         super().__init__()
         # setting of inverted residual blocks
         self.cfgs = cfgs
@@ -150,11 +150,17 @@ class MobileNetV3(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         output_channel = {'large': 1280, 'small': 1024}
         output_channel = _make_divisible(output_channel[mode] * width_mult, 8) if width_mult > 1.0 else output_channel[mode]
-        self.classifier = nn.Sequential(
+        self.regressor = nn.Sequential(
             nn.Linear(exp_size, output_channel),
             h_swish(),
             nn.Dropout(0.2),
             nn.Linear(output_channel, num_points),
+        )
+        self.classifier = nn.Sequential(
+            nn.Linear(exp_size, output_channel),
+            h_swish(),
+            nn.Dropout(0.2),
+            nn.Linear(output_channel, num_classes),
         )
         self.sigmoid = nn.Sigmoid()
         self._initialize_weights()
@@ -164,7 +170,7 @@ class MobileNetV3(nn.Module):
         x = self.conv(x)
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
-        x = self.classifier(x)
+        x = self.regressor(x)
         x = self.sigmoid(x)
         return x.view(x.shape[0],9,2)
 
@@ -227,7 +233,7 @@ def init_pretrained_weights(model, key=''):
     if not os.path.exists(cached_file):
         gdown.download(pretrained_urls[key], cached_file)
 
-    model = load_pretrained_weights(model, cached_file)
+    load_pretrained_weights(model, cached_file)
 
 def mobilenetv3_large(pretrained=False, **kwargs):
     """

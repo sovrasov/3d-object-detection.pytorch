@@ -1,1 +1,1 @@
-from .objectron_data import Objectron
+from .objectron_main import Objectron
