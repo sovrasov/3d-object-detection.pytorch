@@ -21,17 +21,17 @@ class Objectron(Dataset):
         self.root_folder = root_folder
         self.transform = transform
         self.debug_mode = debug_mode
+        self.mode = mode
         if mode == 'train':
             ann_path = Path(root_folder).resolve() /  'annotations/objectron_train.json'
             with open(ann_path, 'r') as f:
                 self.ann = json.load(f)
-        elif mode == 'val':
+        elif mode in ['val', 'test']:
             ann_path = Path(root_folder).resolve() /  'annotations/objectron_test.json'
             with open(ann_path, 'r') as f:
                 self.ann = json.load(f)
         else:
-            assert mode == 'test'
-            return None
+            raise RuntimeError("Unknown dataset mode")
 
     def __len__(self):
         return len(self.ann['annotations'])
@@ -39,7 +39,6 @@ class Objectron(Dataset):
     def __getitem__(self, indx):
         # get path to image from annotations
         raw_keypoints = self.ann['annotations'][indx]['keypoints']
-        bbox = self.ann['annotations'][indx]['bbox']
         img_id = self.ann['annotations'][indx]['image_id']
         category = self.ann['annotations'][indx]['category_id']
         # get raw key points for bb from annotations
@@ -47,8 +46,7 @@ class Objectron(Dataset):
         # read image
         image = cv.imread(img_path, flags=1)
         assert image is not None
-        # The keypoints are [x, y, d] where `x` and `y` are normalized
-        # and `d` is the metric distance from the center of the camera.
+        # The keypoints are [x, y] where `x` and `y` are unnormalized
         # transform raw key points to this representation
         unnormalized_keypoints = np.array(raw_keypoints).reshape(9, 2)
         # "print" image after crop with keypoints if needed
@@ -62,10 +60,10 @@ class Objectron(Dataset):
         cropped_keypoints, cropped_img = self.crop(image, unnormalized_keypoints)
 
         # convert colors from BGR to RGB
-        image = cv.cvtColor(cropped_img, cv.COLOR_BGR2RGB)
+        cropped_img = cv.cvtColor(cropped_img, cv.COLOR_BGR2RGB)
         # do augmentations with keypoints
         if self.transform:
-            transformed = self.transform(image=image, keypoints=cropped_keypoints)
+            transformed = self.transform(image=cropped_img, keypoints=cropped_keypoints)
             assert np.array(transformed['keypoints']).shape == np.random.rand(9,2).shape
 
             transformed_image = transformed['image']
@@ -83,20 +81,20 @@ class Objectron(Dataset):
             cv.imwrite('after_preprocessing.jpg', cv.cvtColor(imgh, cv.COLOR_RGB2BGR))
 
         transformed_image = np.transpose(transformed_image, (2,0,1)).astype(np.float32)
-        # [batch, channels, height, width]
-        return (torch.from_numpy(transformed_image), torch.from_numpy(transformed_bbox), category-1)
+        transformed_bbox = torch.tensor(transformed_bbox, dtype=torch.float32)
+        category = torch.tensor(category - 1, dtype=torch.float32)
 
-    def unnormalize(self, image, normalized_keypoints):
-        ''' transform image to global pixel values '''
-        h, w, _ = image.shape
-        keypoints = np.multiply(normalized_keypoints, np.asarray([w, h], np.float32)).astype(int)
-        return keypoints
+        if self.mode == 'test':
+            return (image,
+                    torch.from_numpy(transformed_image),
+                    transformed_bbox,
+                    category.long())
+
+        return (torch.from_numpy(transformed_image), transformed_bbox, category.long())
 
     def crop(self, image, keypoints):
-        ''' fetch 2D bounding boxes from 3D and crop the image '''
+        ''' fetch 2D bounding boxes from keypoints and crop the image '''
         real_h, real_w, _ = image.shape
-        cropped_imgs = []
-        cropped_bbox = []
 
         # clamp bbox coordinates according to image shape
         clipped_bb = self.clip_bb(keypoints, real_w, real_h)
@@ -124,13 +122,6 @@ class Objectron(Dataset):
 
         return bb, crop_img
 
-    def normalize(self, image, unnormalized_keypoints):
-        ''' normalize keypoints to image coordinates '''
-        h, w, _ = image.shape
-        keypoints = unnormalized_keypoints / np.asarray([w, h], np.float32)
-
-        return keypoints
-
     def clip_bb(self, bbox, w, h):
         ''' clip offset bbox coordinates
         bbox: np.array, shape: [9,2], repr: [x,y]'''
@@ -141,54 +132,44 @@ class Objectron(Dataset):
         return clipped_bbox
 
     @staticmethod
+    def unnormalize(image, normalized_keypoints):
+        ''' transform image to global pixel values '''
+        h, w, _ = image.shape
+        keypoints = np.multiply(normalized_keypoints, np.asarray([w, h], np.float32)).astype(int)
+        return keypoints
+
+    @staticmethod
+    def normalize(image, unnormalized_keypoints):
+        ''' normalize keypoints to image coordinates '''
+        h, w, _ = image.shape
+        keypoints = unnormalized_keypoints / np.asarray([w, h], np.float32)
+
+        return keypoints
+
+    @staticmethod
     def clamp(x, min_x, max_x):
         return min(max(x, min_x), max_x)
 
-def correct_bbox():
-    from tqdm import tqdm
-    broken_pipes = []
-    root = '/home/prokofiev/3D-object-recognition/data'
-    ds = Objectron(root, mode = 'val', transform=None)
-    img_tensor, bbox, num_samples = ds[50000]
-    for id in tqdm(range(len(ds))):
-        try:
-            img_tensor, bbox, num_samples = ds[id]
-        except:
-            broken_pipes.append(id)
-            continue
-    with open('broken_pipes_test.txt', 'w') as f:
-        for item in broken_pipes:
-            f.write("%s\n" % item)
-
-    print(len(broken_pipes), broken_pipes)
-
-def collate(batch):
-    imgs = np.array([np.transpose(np.array(img), (2,0,1)).astype(np.float32)
-                        for batch_inctances in batch for img in batch_inctances[0] if img is not None], dtype=np.float32)
-    bbox = np.array([np.asarray(kp, np.float32) for batch_inctances in batch for kp in batch_inctances[1] if kp is not None], dtype=np.float32)
-    if imgs.size == 0 or bbox.size == 0:
-        return None, None
-
-    return torch.from_numpy(imgs), torch.from_numpy(bbox)
-
-def super_vision_test(root, mode='val', transform=None, index=7):
-    ds = Objectron(root, mode=mode, transform=transform, debug_mode=True)
-    img_tensor, bbox, num_samples = ds[index]
-    assert bbox.shape == torch.empty((9,2)).shape
-
-def dataset_test(root, mode='val', transform=None, batch_size=5):
-    ds = Objectron(root, mode=mode, transform=transform)
-    dataloader = DataLoader(ds, batch_size=batch_size)
-    iter_dt = iter(dataloader)
-    img_tensor, bbox, cat = next(iter_dt)
-    ic(mode)
-    ic(cat)
-    ic(img_tensor.shape)
-    ic(bbox.shape)
-    assert img_tensor.shape == torch.empty((batch_size, 3, 460, 300)).shape
-    assert bbox.shape == torch.empty((batch_size, 9, 2)).shape
 
 def test():
+    "Perform dataloader test"
+    def super_vision_test(root, mode='val', transform=None, index=7):
+        ds = Objectron(root, mode=mode, transform=transform, debug_mode=True)
+        _, bbox, _ = ds[index]
+        assert bbox.shape == torch.empty((9,2)).shape
+
+    def dataset_test(root, mode='val', transform=None, batch_size=5):
+        ds = Objectron(root, mode=mode, transform=transform)
+        dataloader = DataLoader(ds, batch_size=batch_size)
+        iter_dt = iter(dataloader)
+        img_tensor, bbox, cat = next(iter_dt)
+        ic(mode)
+        ic(cat)
+        ic(img_tensor.shape)
+        ic(bbox.shape)
+        assert img_tensor.shape == torch.empty((batch_size, 3, 290, 128)).shape
+        assert bbox.shape == torch.empty((batch_size, 9, 2)).shape
+
     root = '/home/prokofiev/3D-object-recognition/data'
     transform = A.Compose([
                             A.Resize(290, 128),

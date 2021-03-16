@@ -128,7 +128,7 @@ class InvertedResidual(nn.Module):
 
 
 class MobileNetV3(nn.Module):
-    def __init__(self, cfgs, mode, num_points=18, num_classes=9, width_mult=1.):
+    def __init__(self, cfgs, mode, num_points=18, num_classes=4, width_mult=1.):
         super().__init__()
         # setting of inverted residual blocks
         self.cfgs = cfgs
@@ -170,9 +170,10 @@ class MobileNetV3(nn.Module):
         x = self.conv(x)
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
-        x = self.regressor(x)
-        x = self.sigmoid(x)
-        return x.view(x.shape[0],9,2)
+        kp = self.regressor(x)
+        kp = self.sigmoid(kp)
+        targets = self.classifier(x)
+        return kp.view(x.shape[0],9,2), targets
 
     def _initialize_weights(self):
         for m in self.modules():
@@ -203,7 +204,7 @@ def init_pretrained_weights(model, key=''):
     current_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
     parent_dir = os.path.dirname(current_dir)
     sys.path.insert(0, parent_dir)
-    from utils import load_pretrained_weights
+    from scripts import load_pretrained_weights
 
     def _get_torch_home():
         ENV_TORCH_HOME = 'TORCH_HOME'

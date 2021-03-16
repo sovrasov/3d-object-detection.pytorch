@@ -6,7 +6,6 @@ import sys
 module_path = os.path.abspath(os.path.join('../'))
 if module_path not in sys.path:
     sys.path.append(module_path)
-from utils import collate
 from dataloaders import Objectron
 
 
@@ -23,11 +22,8 @@ def build_loader(config, mode='train'):
                             num_workers=config.data.num_workers)
 
     test_dataset = Objectron(config.data.root, mode='test', transform=test_transform)
-    if test_dataset is not None:
-        test_loader = DataLoader(test_dataset, batch_size=config.data.batch_size, shuffle=False,
+    test_loader = DataLoader(test_dataset, batch_size=config.data.batch_size, shuffle=False,
                             num_workers=config.data.num_workers)
-    else:
-        test_loader = None
 
     return train_loader, val_loader, test_loader
 

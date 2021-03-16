@@ -1,5 +1,8 @@
 import pickle
 import sys
+import os
+import errno
+
 from collections import OrderedDict
 import os.path as osp
 from functools import partial
@@ -25,6 +28,24 @@ def check_isfile(fpath):
     if not isfile:
         warnings.warn('No file found at "{}"'.format(fpath))
     return isfile
+
+def mkdir_if_missing(dirname):
+    """Creates dirname if it is missing."""
+    if not osp.exists(dirname):
+        try:
+            os.makedirs(dirname)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
+
+def save_snap(model, optimizer, epoch, log_path):
+    checkpoint = {'state_dict': model.state_dict(),
+                  'optimizer': optimizer.state_dict(),
+                  'epoch': epoch}
+
+    snap_name = f'{log_path}/snap_{epoch}.pth'
+    print(f'==> saving checkpoint to {snap_name}')
+    torch.save(checkpoint, snap_name)
 
 def read_py_config(filename):
     filename = osp.abspath(osp.expanduser(filename))
@@ -164,3 +185,49 @@ class AverageMeter(object):
         self.sum += val * n
         self.count += n
         self.avg = self.sum / self.count
+
+class Logger:
+    """Writes console output to external text file.
+    Imported from `<https://github.com/Cysu/open-reid/blob/master/reid/utils/logging.py>`_
+    Args:
+        fpath (str): directory to save logging file.
+    Examples::
+       >>> import sys
+       >>> import os
+       >>> import os.path as osp
+       >>> save_dir = 'log/resnet50-softmax-market1501'
+       >>> log_name = 'train.log'
+       >>> sys.stdout = Logger(osp.join(save_dir, log_name))
+    """
+
+    def __init__(self, fpath=None):
+        self.console = sys.stdout
+        self.file = None
+        if fpath is not None:
+            mkdir_if_missing(osp.dirname(fpath))
+            self.file = open(fpath, 'w')
+
+    def __del__(self):
+        self.close()
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, *args):
+        self.close()
+
+    def write(self, msg):
+        self.console.write(msg)
+        if self.file is not None:
+            self.file.write(msg)
+
+    def flush(self):
+        self.console.flush()
+        if self.file is not None:
+            self.file.flush()
+            os.fsync(self.file.fileno())
+
+    def close(self):
+        self.console.close()
+        if self.file is not None:
+            self.file.close()

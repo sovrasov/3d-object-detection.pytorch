@@ -1,4 +1,7 @@
 import argparse
+import sys
+import os.path as osp
+import time
 
 import albumentations as A
 import torch
@@ -7,10 +10,9 @@ from torch.utils.tensorboard import SummaryWriter
 from icecream import ic
 
 from models import mobilenetv3_large
-from evaluate import evaluate
-from utils import read_py_config
 from builders import build_loader, build_loss, build_optimizer
-from train_val import Trainer
+from scripts import (Tester, Trainer, compute_average_distance,
+                    compute_average_distance, read_py_config, Logger)
 
 
 def main():
@@ -25,12 +27,18 @@ def main():
     args = parser.parse_args()
     cfg = read_py_config(args.config)
 
+    # translate output to log file
+    log_name = 'train.log'
+    log_name += time.strftime('-%Y-%m-%d-%H-%M-%S')
+    sys.stdout = Logger(osp.join(cfg.output_dir, log_name))
+
+    # init main components
     net = mobilenetv3_large(pretrained=True)
     net.to(args.device)
     if torch.cuda.is_available():
         net = torch.nn.DataParallel(net, **cfg.data_parallel.parallel_params)
 
-    criterion = build_loss(cfg)
+    criterions = build_loss(cfg)
     optimizer = build_optimizer(cfg, net)
     train_loader, val_loader, test_loader = build_loader(cfg)
 
@@ -39,19 +47,23 @@ def main():
                       train_loader,
                       val_loader,
                       optimizer,
-                      criterion,
+                      criterions,
                       writer,
                       cfg.data.max_epochs,
                       cfg.output_dir,
                       args.device,
                       args.save_checkpoint,
                       cfg.debug_mode)
-
+    # main loop
     for epoch in range(cfg.data.max_epochs):
         trainer.train(epoch)
         trainer.val(epoch)
-
-    evaluate(net, test_loader)
+    # test afterward
+    tester = Tester(trainer.model,
+                          test_loader,
+                          cfg,
+                          path_to_save_imgs=cfg.output_dir)
+    tester.run_eval()
 
 if __name__ == "__main__":
     main()
