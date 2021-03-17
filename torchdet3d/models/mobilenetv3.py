@@ -153,13 +153,12 @@ class MobileNetV3(nn.Module):
         self.regressor = nn.Sequential(
             nn.Linear(exp_size, output_channel),
             h_swish(),
-            nn.Dropout(0.2),
             nn.Linear(output_channel, num_points),
         )
         self.classifier = nn.Sequential(
             nn.Linear(exp_size, output_channel),
             h_swish(),
-            nn.Dropout(0.2),
+            nn.Dropout(0.5),
             nn.Linear(output_channel, num_classes),
         )
         self.sigmoid = nn.Sigmoid()
@@ -204,7 +203,7 @@ def init_pretrained_weights(model, key=''):
     current_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
     parent_dir = os.path.dirname(current_dir)
     sys.path.insert(0, parent_dir)
-    from scripts import load_pretrained_weights
+    from  torchdet3d.utils import load_pretrained_weights
 
     def _get_torch_home():
         ENV_TORCH_HOME = 'TORCH_HOME'

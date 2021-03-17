@@ -15,6 +15,7 @@ import torch
 import torch.nn as nn
 from attrdict import AttrDict as adict
 
+
 def check_isfile(fpath):
     """Checks if the given path is a file.
 

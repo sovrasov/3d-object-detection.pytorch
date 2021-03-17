@@ -1,12 +1,9 @@
+import os
+
 from torch.utils.data import DataLoader
 import albumentations as A
 
-import os
-import sys
-module_path = os.path.abspath(os.path.join('../'))
-if module_path not in sys.path:
-    sys.path.append(module_path)
-from dataloaders import Objectron
+from torchdet3d.dataloaders import Objectron
 
 
 def build_loader(config, mode='train'):

@@ -1,0 +1,13 @@
+albumentations
+attrdict
+opencv-python
+numpy
+sklearn
+tqdm
+matplotlib
+tensorboard
+onnx
+glog
+torchvision
+torch
+gdown

@@ -7,11 +7,10 @@ import cv2 as cv
 import json
 import numpy as np
 from icecream import ic
-from numba import jit
 import albumentations as A
 import sys
 
-sys.path.insert(1, '/home/prokofiev/Objectron')
+
 from objectron.schema import features
 from objectron.dataset import box, graphics
 
@@ -23,11 +22,11 @@ class Objectron(Dataset):
         self.debug_mode = debug_mode
         self.mode = mode
         if mode == 'train':
-            ann_path = Path(root_folder).resolve() /  'annotations/objectron_train.json'
+            ann_path = Path(root_folder).resolve() / 'annotations/objectron_train.json'
             with open(ann_path, 'r') as f:
                 self.ann = json.load(f)
         elif mode in ['val', 'test']:
-            ann_path = Path(root_folder).resolve() /  'annotations/objectron_test.json'
+            ann_path = Path(root_folder).resolve() / 'annotations/objectron_test.json'
             with open(ann_path, 'r') as f:
                 self.ann = json.load(f)
         else:
@@ -153,6 +152,7 @@ class Objectron(Dataset):
 
 def test():
     "Perform dataloader test"
+
     def super_vision_test(root, mode='val', transform=None, index=7):
         ds = Objectron(root, mode=mode, transform=transform, debug_mode=True)
         _, bbox, _ = ds[index]
@@ -170,7 +170,7 @@ def test():
         assert img_tensor.shape == torch.empty((batch_size, 3, 290, 128)).shape
         assert bbox.shape == torch.empty((batch_size, 9, 2)).shape
 
-    root = '/home/prokofiev/3D-object-recognition/data'
+    root = '/data'
     transform = A.Compose([
                             A.Resize(290, 128),
                             A.RandomBrightnessContrast(p=0.2),

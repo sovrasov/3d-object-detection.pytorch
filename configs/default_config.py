@@ -11,10 +11,14 @@ data = dict(
 data_parallel = dict(use_parallel=False,
                      parallel_params=dict(device_ids=[0,1], output_device=0))
 
-output_dir = './log_out'
+model = dict(load_weights='')
 
 optim = dict(name='sgd', lr=0.01, momentum=0.9, wd=5e-4, betas=(0.9, 0.999), rho=0.9, alpha=0.99)
 
 loss=dict(names=['smoothl1', 'cross_entropy'])
 
+output_dir = './log_out'
+
 debug_mode = True
+
+regime = 'training'
