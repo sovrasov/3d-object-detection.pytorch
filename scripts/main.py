@@ -58,7 +58,7 @@ def main():
                       save_chkpt=args.save_checkpoint,
                       debug=cfg.debug_mode)
 
-    evaluater = Evaluater(model=net,
+    evaluator = Evaluator(model=net,
                           val_loader=val_loader,
                           test_loader=test_loader,
                           checkpoint_path=cfg.model.load_weights,
@@ -70,14 +70,14 @@ def main():
                           debug=cfg.debug_mode)
     # main loop
     if cfg.regime == "evaluation":
-        evaluater.run_eval_pipe()
+        evaluator.run_eval_pipe()
     else:
         assert cfg.regime == "training"
         for epoch in range(cfg.data.max_epochs):
             trainer.train(epoch)
             scheduler.step()
-            evaluater.val(epoch)
-        evaluater.visual_test()
+            evaluator.val(epoch)
+        evaluator.visual_test()
 
 
 if __name__ == "__main__":

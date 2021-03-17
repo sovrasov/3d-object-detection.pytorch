@@ -19,7 +19,7 @@ if module_path not in sys.path:
 from objectron.dataset import graphics
 
 @dataclass
-class Evaluater:
+class Evaluator:
     model: object
     val_loader: object
     test_loader: object

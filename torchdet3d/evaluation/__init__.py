@@ -1,2 +1,2 @@
-from .evaluate import Evaluater
+from .evaluate import Evaluator
 from .metrics import *
