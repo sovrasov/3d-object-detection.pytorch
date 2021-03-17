@@ -12,7 +12,7 @@ from icecream import ic
 
 import torchdet3d
 from torchdet3d.models import mobilenetv3_large
-from torchdet3d.builders import build_loader, build_loss, build_optimizer
+from torchdet3d.builders import *
 from torchdet3d.evaluation import Evaluater, compute_average_distance, compute_average_distance
 from torchdet3d.trainer import Trainer
 from torchdet3d.utils import read_py_config, Logger
@@ -38,11 +38,12 @@ def main():
     # init main components
     net = mobilenetv3_large(pretrained=True)
     net.to(args.device)
-    if torch.cuda.is_available():
+    if (torch.cuda.is_available() and args.device == 'cuda'):
         net = torch.nn.DataParallel(net, **cfg.data_parallel.parallel_params)
 
     criterions = build_loss(cfg)
     optimizer = build_optimizer(cfg, net)
+    scheduler = build_scheduler(cfg, optimizer)
     train_loader, val_loader, test_loader = build_loader(cfg)
     writer = SummaryWriter(cfg.output_dir)
 
@@ -74,6 +75,7 @@ def main():
         assert cfg.regime == "training"
         for epoch in range(cfg.data.max_epochs):
             trainer.train(epoch)
+            scheduler.step()
             evaluater.val(epoch)
         evaluater.visual_test()
 
