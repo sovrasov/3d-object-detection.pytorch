@@ -127,7 +127,7 @@ def test():
     def super_vision_test(root, mode='val', transform=None, index=7):
         ds = Objectron(root, mode=mode, transform=transform, debug_mode=True)
         _, bbox, _ = ds[index]
-        assert bbox.shape == torch.empty((9,2)).shape
+        assert bbox.shape == (9,2)
 
     def dataset_test(root, mode='val', transform=None, batch_size=5):
         ds = Objectron(root, mode=mode, transform=transform)
@@ -138,8 +138,8 @@ def test():
         ic(cat)
         ic(img_tensor.shape)
         ic(bbox.shape)
-        assert img_tensor.shape == torch.empty((batch_size, 3, 290, 290)).shape
-        assert bbox.shape == torch.empty((batch_size, 9, 2)).shape
+        assert img_tensor.shape == (batch_size, 3, 290, 290)
+        assert bbox.shape == (batch_size, 9, 2)
 
     root = 'data'
     transform = A.Compose([ ConvertColor(),
