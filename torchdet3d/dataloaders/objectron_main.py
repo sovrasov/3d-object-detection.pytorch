@@ -10,9 +10,8 @@ from icecream import ic
 import albumentations as A
 import sys
 
-
-from objectron.schema import features
-from objectron.dataset import box, graphics
+from torchdet3d.utils import draw_kp, normalize, unnormalize, ToTensor, ConvertColor
+from objectron.dataset import graphics
 
 
 class Objectron(Dataset):
@@ -39,57 +38,45 @@ class Objectron(Dataset):
         # get path to image from annotations
         raw_keypoints = self.ann['annotations'][indx]['keypoints']
         img_id = self.ann['annotations'][indx]['image_id']
-        category = self.ann['annotations'][indx]['category_id']
+        category = int(self.ann['annotations'][indx]['category_id']) - 1
         # get raw key points for bb from annotations
         img_path = self.root_folder + '/' + (self.ann['images'][img_id]['file_name'])
         # read image
-        image = cv.imread(img_path, flags=1)
+        image = cv.imread(img_path)
         assert image is not None
         # The keypoints are [x, y] where `x` and `y` are unnormalized
         # transform raw key points to this representation
         unnormalized_keypoints = np.array(raw_keypoints).reshape(9, 2)
         # "print" image after crop with keypoints if needed
         if self.debug_mode:
-            imgh = image.copy()
-            b = np.zeros((9,3))
-            b[:,:2] = self.normalize(image, unnormalized_keypoints)
-            graphics.draw_annotation_on_image(imgh, b , [9])
-            cv.imwrite('image_before_pipeline.jpg', imgh)
+            draw_kp(image, unnormalized_keypoints, 'image_before_pipeline.jpg',
+                    normalized=False, RGB=False)
         # given unnormalized keypoints crop object on image
         cropped_keypoints, cropped_img = self.crop(image, unnormalized_keypoints)
 
-        # convert colors from BGR to RGB
-        cropped_img = cv.cvtColor(cropped_img, cv.COLOR_BGR2RGB)
         # do augmentations with keypoints
         if self.transform:
             transformed = self.transform(image=cropped_img, keypoints=cropped_keypoints)
-            assert np.array(transformed['keypoints']).shape == np.random.rand(9,2).shape
-
             transformed_image = transformed['image']
-            transformed_bbox = transformed['keypoints']
+            transformed_keypoints = transformed['keypoints']
+            assert (transformed_keypoints.shape == (9,2) and
+                    isinstance(transformed_image, torch.Tensor) and
+                    isinstance(transformed_keypoints, torch.Tensor))
         else:
-            transformed_image, transformed_bbox = image, cropped_keypoints
+            transformed_image, transformed_keypoints = image, cropped_keypoints
         # given croped image and unnormalized key points: normilize it for cropped image
-        transformed_bbox = self.normalize(transformed_image, transformed_bbox)
+        transformed_keypoints = normalize(transformed_image.permute(1,2,0), transformed_keypoints)
         # "print" image after crop with keypoints if needed
         if self.debug_mode:
-            imgh = transformed_image.copy()
-            b = np.zeros((9,3))
-            b[:,:2] = transformed_bbox
-            graphics.draw_annotation_on_image(imgh, b , [9])
-            cv.imwrite('after_preprocessing.jpg', cv.cvtColor(imgh, cv.COLOR_RGB2BGR))
-
-        transformed_image = np.transpose(transformed_image, (2,0,1)).astype(np.float32)
-        transformed_bbox = torch.tensor(transformed_bbox, dtype=torch.float32)
-        category = torch.tensor(category - 1, dtype=torch.float32)
+            draw_kp(transformed_image.numpy(), transformed_keypoints.numpy(), 'image_after_pipeline.jpg')
 
         if self.mode == 'test':
             return (image,
                     torch.from_numpy(transformed_image),
-                    transformed_bbox,
-                    category.long())
+                    transformed_keypoints,
+                    category)
 
-        return (torch.from_numpy(transformed_image), transformed_bbox, category.long())
+        return transformed_image, transformed_keypoints, category
 
     def crop(self, image, keypoints):
         ''' fetch 2D bounding boxes from keypoints and crop the image '''
@@ -117,7 +104,7 @@ class Objectron(Dataset):
 
         crop_img = transformed['image']
         bb = transformed['keypoints']
-        assert np.array(bb).shape == np.random.rand(9,2).shape
+        assert len(bb) == 9
 
         return bb, crop_img
 
@@ -131,28 +118,12 @@ class Objectron(Dataset):
         return clipped_bbox
 
     @staticmethod
-    def unnormalize(image, normalized_keypoints):
-        ''' transform image to global pixel values '''
-        h, w, _ = image.shape
-        keypoints = np.multiply(normalized_keypoints, np.asarray([w, h], np.float32)).astype(int)
-        return keypoints
-
-    @staticmethod
-    def normalize(image, unnormalized_keypoints):
-        ''' normalize keypoints to image coordinates '''
-        h, w, _ = image.shape
-        keypoints = unnormalized_keypoints / np.asarray([w, h], np.float32)
-
-        return keypoints
-
-    @staticmethod
     def clamp(x, min_x, max_x):
         return min(max(x, min_x), max_x)
 
 
 def test():
     "Perform dataloader test"
-
     def super_vision_test(root, mode='val', transform=None, index=7):
         ds = Objectron(root, mode=mode, transform=transform, debug_mode=True)
         _, bbox, _ = ds[index]
@@ -160,23 +131,24 @@ def test():
 
     def dataset_test(root, mode='val', transform=None, batch_size=5):
         ds = Objectron(root, mode=mode, transform=transform)
-        dataloader = DataLoader(ds, batch_size=batch_size)
+        dataloader = DataLoader(ds, batch_size=batch_size, shuffle=True)
         iter_dt = iter(dataloader)
         img_tensor, bbox, cat = next(iter_dt)
         ic(mode)
         ic(cat)
         ic(img_tensor.shape)
         ic(bbox.shape)
-        assert img_tensor.shape == torch.empty((batch_size, 3, 290, 128)).shape
+        assert img_tensor.shape == torch.empty((batch_size, 3, 290, 290)).shape
         assert bbox.shape == torch.empty((batch_size, 9, 2)).shape
 
-    root = '/data'
-    transform = A.Compose([
-                            A.Resize(290, 128),
+    root = 'data'
+    transform = A.Compose([ ConvertColor(),
+                            A.Resize(290, 290),
                             A.RandomBrightnessContrast(p=0.2),
-                          ], keypoint_params=A.KeypointParams(format='xy'))
+                            ToTensor()
+                          ],keypoint_params=A.KeypointParams(format='xy'))
 
-    super_vision_test(root, mode='train', transform=transform, index=180435)
+    super_vision_test(root, mode='train', transform=transform, index=200435)
     dataset_test(root, mode='val', transform=transform, batch_size=256)
     dataset_test(root, mode='train', transform=transform, batch_size=256)
 
