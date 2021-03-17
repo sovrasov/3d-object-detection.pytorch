@@ -68,15 +68,6 @@ def read_py_config(filename):
 
     return cfg_dict
 
-def collate(batch):
-    imgs = np.array([np.transpose(np.array(img), (2,0,1)).astype(np.float32)
-                        for batch_inctances in batch for img in batch_inctances[0] if img is not None], dtype=np.float32)
-    bbox = np.array([np.asarray(kp, np.float32) for batch_inctances in batch for kp in batch_inctances[1] if kp is not None], dtype=np.float32)
-    if imgs.size == 0 or bbox.size == 0:
-        return None, None
-
-    return torch.from_numpy(imgs), torch.from_numpy(bbox)
-
 def load_checkpoint(fpath):
     r"""Loads checkpoint.
 
