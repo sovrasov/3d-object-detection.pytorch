@@ -1,5 +1,4 @@
 import torch
-from icecream import ic
 
 def compute_average_distance(pred_box, gt_box, num_keypoint=9):
     """Computes Average Distance (ADD) metric."""

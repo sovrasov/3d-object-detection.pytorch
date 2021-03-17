@@ -4,7 +4,7 @@ from torch.utils.data import DataLoader
 import albumentations as A
 
 from torchdet3d.dataloaders import Objectron
-
+from torchdet3d.utils import ToTensor, ConvertColor
 
 def build_loader(config, mode='train'):
 
@@ -28,16 +28,20 @@ def build_augmentations(cfg):
     normalize = A.augmentations.transforms.Normalize (**cfg.data.normalization)
 
     train_transform = A.Compose([
+                            ConvertColor(),
                             A.Resize(*cfg.data.resize),
                             A.HorizontalFlip(p=0.5),
                             A.augmentations.transforms.ISONoise(color_shift=(0.15,0.35),
                                                                 intensity=(0.2, 0.5), p=0.2),
-                            normalize
+                            normalize,
+                            ToTensor()
                             ], keypoint_params=A.KeypointParams(format='xy', remove_invisible=False))
 
     test_transform = A.Compose([
+                            ConvertColor(),
                             A.Resize(*cfg.data.resize),
-                            normalize
+                            normalize,
+                            ToTensor()
                             ], keypoint_params=A.KeypointParams(format='xy', remove_invisible=False))
 
     return train_transform, test_transform

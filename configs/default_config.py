@@ -2,7 +2,7 @@ data = dict(
     root="./data",
     resize=(224,128),
     batch_size=128,
-    max_epochs=1,
+    max_epochs=70,
     num_workers=4,
     normalization=dict(mean=[0.5931, 0.4690, 0.4229],
                        std=[0.2471, 0.2214, 0.2157])

@@ -13,7 +13,7 @@ from icecream import ic
 import torchdet3d
 from torchdet3d.models import mobilenetv3_large
 from torchdet3d.builders import *
-from torchdet3d.evaluation import Evaluater, compute_average_distance, compute_average_distance
+from torchdet3d.evaluation import Evaluator, compute_average_distance, compute_average_distance
 from torchdet3d.trainer import Trainer
 from torchdet3d.utils import read_py_config, Logger
 

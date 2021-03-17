@@ -16,14 +16,6 @@ def find_version():
     return locals()['__version__']
 
 
-def numpy_include():
-    try:
-        numpy_include = np.get_include()
-    except AttributeError:
-        numpy_include = np.get_numpy_include()
-    return numpy_include
-
-
 def get_requirements(filename='requirements.txt'):
     here = osp.dirname(osp.realpath(__file__))
     with open(osp.join(here, filename), 'r') as f:
