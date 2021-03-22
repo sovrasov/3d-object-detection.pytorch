@@ -10,7 +10,8 @@ from icecream import ic
 import albumentations as A
 import sys
 
-from torchdet3d.utils import draw_kp, normalize, unnormalize, ToTensor, ConvertColor
+from torchdet3d.utils import (draw_kp, normalize, unnormalize,
+                                unnormalize_img, ToTensor, ConvertColor)
 from objectron.dataset import graphics
 
 
@@ -20,6 +21,11 @@ class Objectron(Dataset):
         self.transform = transform
         self.debug_mode = debug_mode
         self.mode = mode
+        from itertools import islice
+        def take(n, iterable):
+            "Return first n items of the iterable as a list"
+            return list(islice(iterable, n))
+
         if mode == 'train':
             ann_path = Path(root_folder).resolve() / 'annotations/objectron_train.json'
             with open(ann_path, 'r') as f:
@@ -64,15 +70,13 @@ class Objectron(Dataset):
                     isinstance(transformed_keypoints, torch.Tensor))
         else:
             transformed_image, transformed_keypoints = image, cropped_keypoints
-        # given croped image and unnormalized key points: normilize it for cropped image
-        transformed_keypoints = normalize(transformed_image.permute(1,2,0), transformed_keypoints)
         # "print" image after crop with keypoints if needed
         if self.debug_mode:
-            draw_kp(transformed_image.numpy(), transformed_keypoints.numpy(), 'image_after_pipeline.jpg')
+            draw_kp(unnormalize_img(transformed_image).numpy(), transformed_keypoints.numpy(), 'image_after_pipeline.jpg')
 
         if self.mode == 'test':
             return (image,
-                    torch.from_numpy(transformed_image),
+                    transformed_image,
                     transformed_keypoints,
                     category)
 
@@ -141,14 +145,17 @@ def test():
         assert img_tensor.shape == (batch_size, 3, 290, 290)
         assert bbox.shape == (batch_size, 9, 2)
 
-    root = 'data'
+    root = 'data_cereal_box'
+    normalize = A.augmentations.transforms.Normalize(**dict(mean=[0.5931, 0.4690, 0.4229],
+                                                            std=[0.2471, 0.2214, 0.2157]))
     transform = A.Compose([ ConvertColor(),
                             A.Resize(290, 290),
                             A.RandomBrightnessContrast(p=0.2),
-                            ToTensor()
+                            normalize,
+                            ToTensor((290, 290)),
                           ],keypoint_params=A.KeypointParams(format='xy'))
 
-    super_vision_test(root, mode='train', transform=transform, index=200435)
+    super_vision_test(root, mode='train', transform=transform, index=1540)
     dataset_test(root, mode='val', transform=transform, batch_size=256)
     dataset_test(root, mode='train', transform=transform, batch_size=256)
 

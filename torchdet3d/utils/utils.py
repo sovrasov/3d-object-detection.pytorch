@@ -105,7 +105,7 @@ def load_checkpoint(fpath):
         raise
     return checkpoint
 
-def load_pretrained_weights(model, file_path='', pretrained_dict=None, resume=False):
+def load_pretrained_weights(model, file_path='', pretrained_dict=None, resume=False, parallel_model=False):
     r"""Loads pretrianed weights to model. Imported from openvinotoolkit/deep-object-reid.
     Features::
         - Incompatible layers (unmatched in name or size) will be ignored.
@@ -132,10 +132,12 @@ def load_pretrained_weights(model, file_path='', pretrained_dict=None, resume=Fa
     model_dict = model.state_dict()
     new_state_dict = OrderedDict()
     matched_layers, discarded_layers = [], []
-
     for k, v in state_dict.items():
-        if k.startswith('module.') and not resume:
-            k = k[7:]  # discard module.
+        if (k.startswith('module.') and
+            not resume and
+            not parallel_model):
+            # discard module.
+            k = k[7:]
         if k in model_dict and model_dict[k].size() == v.size():
             new_state_dict[k] = v
             matched_layers.append(k)
@@ -163,19 +165,40 @@ def load_pretrained_weights(model, file_path='', pretrained_dict=None, resume=Fa
                 format(discarded_layers)
             )
 
-def unnormalize(image, normalized_keypoints):
+def unnormalize_img(img,
+                mean=[0.5931, 0.4690, 0.4229],
+                std=[0.2471, 0.2214, 0.2157],
+                tensor=True):
+    if tensor:
+        mean = torch.tensor(mean, device=img.device) * 255
+        std = torch.tensor(std, device=img.device) * 255
+        return img.permute(1, 2, 0)*std + mean
+    else:
+        return img*std + mean
+
+def unnormalize(image_shape, normalized_keypoints):
     ''' transform image to global pixel values '''
-    h, w, _ = image.shape
+    assert len(image_shape) in [2,3]
+    if len(image_shape) == 3:
+        h, w, _ = image_shape
+    else:
+        h, w = image_shape
+
     keypoints = np.multiply(normalized_keypoints, np.asarray([w, h], np.float32)).astype(int)
     return keypoints
 
-def normalize(image, unnormalized_keypoints):
+def normalize(image_shape, unnormalized_keypoints):
     ''' normalize keypoints to image coordinates '''
-    h, w, _ = image.shape
+    assert len(image_shape) in [2,3]
+    if len(image_shape) == 3:
+        h, w, _ = image_shape
+    else:
+        h, w = image_shape
+
     keypoints = unnormalized_keypoints / np.asarray([w, h], np.float32)
     return keypoints
 
-def draw_kp(img, keypoints, name, normalized=True, RGB=True, num_keypoints=9):
+def draw_kp(img, keypoints, name, normalized=True, RGB=True, num_keypoints=9, label=None):
     '''
     img: numpy three dimensional array
     keypoints: array like with shape [9,2]
@@ -189,9 +212,13 @@ def draw_kp(img, keypoints, name, normalized=True, RGB=True, num_keypoints=9):
     img_copy = cv.cvtColor(img_copy, cv.COLOR_RGB2BGR) if RGB else img_copy
     # expand dim with zeros, needed for drawing function API
     expanded_kp = np.zeros((num_keypoints,3))
-    keypoints = keypoints if normalized else normalize(img_copy, keypoints)
+    keypoints = keypoints if normalized else normalize(img_copy.shape, keypoints)
     expanded_kp[:,:2] = keypoints
     graphics.draw_annotation_on_image(img_copy, expanded_kp , [num_keypoints])
+    # put class label if given
+    if label:
+        font = cv.FONT_HERSHEY_SIMPLEX
+        cv.putText(img_copy, str(label), (10,180), font, (0, 255, 0), 2, cv.LINE_AA)
     cv.imwrite(name, img_copy)
 
 class AverageMeter(object):

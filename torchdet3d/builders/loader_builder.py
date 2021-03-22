@@ -22,7 +22,7 @@ def build_loader(config, mode='train'):
     test_loader = DataLoader(test_dataset, batch_size=config.data.batch_size, shuffle=False,
                             num_workers=config.data.num_workers)
 
-    return train_loader, val_loader, test_loader
+    return train_loader, train_loader, test_loader
 
 def build_augmentations(cfg):
     normalize = A.augmentations.transforms.Normalize (**cfg.data.normalization)
@@ -34,14 +34,14 @@ def build_augmentations(cfg):
                             A.augmentations.transforms.ISONoise(color_shift=(0.15,0.35),
                                                                 intensity=(0.2, 0.5), p=0.2),
                             normalize,
-                            ToTensor()
+                            ToTensor(cfg.data.resize)
                             ], keypoint_params=A.KeypointParams(format='xy', remove_invisible=False))
 
     test_transform = A.Compose([
                             ConvertColor(),
                             A.Resize(*cfg.data.resize),
                             normalize,
-                            ToTensor()
+                            ToTensor(cfg.data.resize)
                             ], keypoint_params=A.KeypointParams(format='xy', remove_invisible=False))
 
     return train_transform, test_transform
