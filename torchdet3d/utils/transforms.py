@@ -3,6 +3,7 @@ import numpy as np
 import torch
 from albumentations.core.transforms_interface import BasicTransform, ImageOnlyTransform
 
+from torchdet3d.utils import normalize
 
 class ConvertColor(ImageOnlyTransform):
     """Converting color of the image
@@ -16,8 +17,9 @@ class ConvertColor(ImageOnlyTransform):
 class ToTensor(BasicTransform):
     """Converting color of the image
     """
-    def __init__(self, always_apply=True, p=1.0):
+    def __init__(self, img_shape, always_apply=True, p=1.0):
         super().__init__(always_apply=always_apply, p=p)
+        self.img_final_shape = img_shape
 
     @property
     def targets(self):
@@ -33,4 +35,5 @@ class ToTensor(BasicTransform):
         return torch.from_numpy(img.transpose(2, 0, 1)).float()
 
     def apply_to_keypoints(self, keypoints, **params):
+        keypoints = normalize(self.img_final_shape, keypoints)
         return  torch.tensor(keypoints, dtype=torch.float)

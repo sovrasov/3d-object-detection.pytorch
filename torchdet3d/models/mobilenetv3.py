@@ -2,6 +2,10 @@ import math
 
 import torch
 import torch.nn as nn
+from icecream import ic
+
+from  torchdet3d.utils import load_pretrained_weights
+
 
 __all__ = ['mobilenetv3_large', 'mobilenetv3_small']
 
@@ -128,10 +132,12 @@ class InvertedResidual(nn.Module):
 
 
 class MobileNetV3(nn.Module):
-    def __init__(self, cfgs, mode, num_points=18, num_classes=4, width_mult=1.):
+    def __init__(self, cfgs, mode, num_points=18, num_classes=9, width_mult=1.):
         super().__init__()
         # setting of inverted residual blocks
         self.cfgs = cfgs
+        self.num_points = num_points
+        self.num_classes = num_classes
         assert mode in ['large', 'small']
 
         # building first layer
@@ -150,29 +156,34 @@ class MobileNetV3(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         output_channel = {'large': 1280, 'small': 1024}
         output_channel = _make_divisible(output_channel[mode] * width_mult, 8) if width_mult > 1.0 else output_channel[mode]
-        self.regressor = nn.Sequential(
-            nn.Linear(exp_size, output_channel),
-            h_swish(),
-            nn.Linear(output_channel, num_points),
-        )
+
+        self.regressors = nn.ModuleList()
+        for trg_id, trg_num_classes in enumerate(range(self.num_classes)):
+            self.regressors.append(self._init_regressors(exp_size, output_channel))
+
         self.classifier = nn.Sequential(
             nn.Linear(exp_size, output_channel),
             h_swish(),
             nn.Dropout(0.5),
-            nn.Linear(output_channel, num_classes),
+            nn.Linear(output_channel, self.num_classes),
         )
+
         self.sigmoid = nn.Sigmoid()
         self._initialize_weights()
 
-    def forward(self, x):
+    def forward(self, x, cats):
         x = self.features(x)
         x = self.conv(x)
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
-        kp = self.regressor(x)
+        if self.num_classes == 1:
+            # to save time
+            kp = self.regressors[0](x)
+        else:
+            kp = torch.cat([self.regressors[id](sample) for id, sample in zip(cats, x)], 0)
         kp = self.sigmoid(kp)
-        targets = self.classifier(x)
-        return kp.view(x.shape[0],9,2), targets
+        targets = self.classifier(x) if self.num_classes > 1 else torch.zeros(kp.size(0), self.num_classes).to(x.device)
+        return kp.view(x.size(0), self.num_points // 2, 2), targets
 
     def _initialize_weights(self):
         for m in self.modules():
@@ -189,6 +200,13 @@ class MobileNetV3(nn.Module):
                 if m.bias is not None:
                     m.bias.data.zero_()
 
+    def _init_regressors(self, exp_size, output_channel):
+        return nn.Sequential(
+            nn.Linear(exp_size, output_channel),
+            h_swish(),
+            nn.Linear(output_channel, self.num_points),
+        )
+
 def init_pretrained_weights(model, key=''):
     """Initializes model with pretrained weights.
 
@@ -199,11 +217,6 @@ def init_pretrained_weights(model, key=''):
     import errno
     import inspect
     import gdown
-
-    current_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-    parent_dir = os.path.dirname(current_dir)
-    sys.path.insert(0, parent_dir)
-    from  torchdet3d.utils import load_pretrained_weights
 
     def _get_torch_home():
         ENV_TORCH_HOME = 'TORCH_HOME'
@@ -235,7 +248,7 @@ def init_pretrained_weights(model, key=''):
 
     load_pretrained_weights(model, cached_file)
 
-def mobilenetv3_large(pretrained=False, **kwargs):
+def mobilenetv3_large(pretrained=False, resume='', **kwargs):
     """
     Constructs a MobileNetV3-Large model
     """
@@ -259,12 +272,14 @@ def mobilenetv3_large(pretrained=False, **kwargs):
     ]
 
     net = MobileNetV3(cfgs, mode='large', width_mult = 1., **kwargs)
-    if pretrained:
+    if resume:
+        load_pretrained_weights(net, resume)
+    elif pretrained:
         init_pretrained_weights(net, key='mobilenetv3_large')
 
     return net
 
-def mobilenetv3_small(pretrained=False, **kwargs):
+def mobilenetv3_small(pretrained=False, resume='', **kwargs):
     """
     Constructs a MobileNetV3-Small model
     """
@@ -283,6 +298,8 @@ def mobilenetv3_small(pretrained=False, **kwargs):
         [5,    6,  96, 1, 1, 1],
     ]
     net = MobileNetV3(cfgs, mode='small', width_mult = 1., **kwargs)
+    if resume:
+        load_pretrained_weights(net, resume)
     if pretrained:
         init_pretrained_weights(net, key='mobilenetv3_small')
 

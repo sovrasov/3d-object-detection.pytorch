@@ -31,9 +31,9 @@ def main():
     sys.stdout = Logger(osp.join(cfg.output_dir, log_name))
 
     # init main components
-    net = mobilenetv3_large(pretrained=True)
+    net = mobilenetv3_large(pretrained=cfg.model.pretrained, num_classes=cfg.model.num_classes, resume=cfg.model.load_weights)
     net.to(args.device)
-    if (torch.cuda.is_available() and args.device == 'cuda'):
+    if (torch.cuda.is_available() and args.device == 'cuda' and cfg.data_parallel.use_parallel):
         net = torch.nn.DataParallel(net, **cfg.data_parallel.parallel_params)
 
     criterions = build_loss(cfg)
@@ -56,7 +56,6 @@ def main():
     evaluator = Evaluator(model=net,
                           val_loader=val_loader,
                           test_loader=test_loader,
-                          checkpoint_path=cfg.model.load_weights,
                           cfg=cfg,
                           writer=writer,
                           device=args.device,

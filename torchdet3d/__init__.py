@@ -7,6 +7,7 @@ import sys
 import os
 
 module_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../3rdparty/Objectron'))
+module_path='/home/prokofiev/3D-object-recognition/3rdparty/Objectron'
 if module_path not in sys.path:
     sys.path.append(module_path)
 
