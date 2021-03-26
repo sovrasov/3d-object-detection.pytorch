@@ -7,14 +7,27 @@ from collections import OrderedDict
 import os.path as osp
 from functools import partial
 from importlib import import_module
+import random
+import os
+import warnings
 
 import numpy as np
 import cv2 as cv
 import torch
-import warnings
+import torch.nn as nn
+
 from attrdict import AttrDict as adict
 
 from objectron.dataset import graphics
+
+def set_random_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    np.random.seed(seed)
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
 
 def check_isfile(fpath):
     """Checks if the given path is a file.
@@ -216,7 +229,7 @@ def draw_kp(img, keypoints, name, normalized=True, RGB=True, num_keypoints=9, la
     # put class label if given
     if label:
         font = cv.FONT_HERSHEY_SIMPLEX
-        cv.putText(img_copy, str(label), (10,180), font, (0, 255, 0), 2, cv.LINE_AA)
+        cv.putText(img_copy, str(label), (10,180), font, 1, (0, 255, 0), 2, cv.LINE_AA)
     cv.imwrite(name, img_copy)
 
 class AverageMeter:

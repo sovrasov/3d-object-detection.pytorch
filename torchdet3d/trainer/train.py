@@ -4,17 +4,17 @@ from dataclasses import dataclass
 from torchdet3d.evaluation import compute_average_distance, compute_accuracy
 from torchdet3d.utils import AverageMeter, save_snap
 
-
 @dataclass
 class Trainer:
     model: object
     train_loader: object
     optimizer: object
     criterions: list
+    losses_coeffs: list
     writer: object
     max_epoch : float
     log_path : str
-    device : str ='cuda:0'
+    device : str ='cuda'
     save_chkpt: bool = True
     debug: bool = False
     train_step: int = 0
@@ -29,19 +29,15 @@ class Trainer:
 
         # switch to train mode and train one epoch
         self.model.train()
-        reg_criterion, class_criterion = self.criterions
         loop = tqdm(enumerate(self.train_loader), total=len(self.train_loader), leave=False)
         for it, (imgs, gt_kp, gt_cats) in loop:
             # put image and keypoints on the appropriate device
+            ic(self.device)
             imgs, gt_kp, gt_cats = self.put_on_device([imgs, gt_kp, gt_cats], self.device)
             # compute output and loss
             pred_kp, pred_cats = self.model(imgs, gt_cats)
-            reg_loss = reg_criterion(pred_kp, gt_kp)
-            if class_criterion is not None:
-                class_loss = class_criterion(pred_cats, gt_cats)
-                loss = class_loss + reg_loss # FIX losses contribution
-            else:
-                loss = reg_loss
+            # get parsed loss
+            loss = self.parse_losses(pred_kp, gt_kp, pred_cats, gt_cats)
             # compute gradient and do SGD step
             self.optimizer.zero_grad()
             loss.backward()
@@ -62,10 +58,9 @@ class Trainer:
             self.train_step += 1
             # update progress bar
             loop.set_description(f'Epoch [{epoch}/{self.max_epoch}]')
-            loop.set_postfix(loss=loss, avr_loss = losses.avg,
+            loop.set_postfix(loss=loss.item(), avr_loss = losses.avg,
                              ADD=ADD, avr_ADD=ADD_meter.avg, SADD=SADD,
-                             avr_SADD=SADD_meter.avg, acc=acc, acc_avg = ACC_meter.avg,
-                             lr=self.optimizer.param_groups[0]['lr'])
+                             avr_SADD=SADD_meter.avg, acc=acc, lr=self.optimizer.param_groups[0]['lr'], acc_avg = ACC_meter.avg)
 
             if self.debug and it == 10:
                 break
@@ -73,8 +68,27 @@ class Trainer:
         if self.save_chkpt:
             save_snap(self.model, self.optimizer, epoch, self.log_path)
 
-        print(f"train: epoch: {epoch}, ADD: {ADD_meter.avg},"
+        print(f"\ntrain: epoch: {epoch}, ADD: {ADD_meter.avg},"
               f" SADD: {SADD_meter.avg}, loss: {losses.avg}, accuracy: {ACC_meter.avg}")
+
+    def parse_losses(self, pred_kp, gt_kp, pred_cats, gt_cats):
+        reg_criterions, class_criterions = self.criterions
+        reg_coeffs, class_coeffs = self.losses_coeffs
+        assert len(reg_coeffs) == len(reg_criterions)
+        assert len(class_coeffs) == len(class_criterions)
+
+        if class_criterions:
+            class_loss = []
+            for k, cr in zip(class_coeffs, class_criterions):
+                class_loss.append(cr(pred_kp, gt_kp) * k)
+        else:
+            class_loss = torch.zeros(1, requires_grad=True)
+
+        regress_loss = []
+        for k, cr in zip(reg_coeffs, reg_criterions):
+            regress_loss.append(cr(pred_kp, gt_kp) * k)
+        ic(regress_loss)
+        return sum(regress_loss) + sum(class_loss)
 
     @staticmethod
     def put_on_device(items, device):

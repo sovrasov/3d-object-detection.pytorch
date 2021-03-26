@@ -10,7 +10,7 @@ from torchdet3d.models import mobilenetv3_large
 from torchdet3d.builders import build_loader, build_loss, build_optimizer, build_scheduler
 from torchdet3d.evaluation import Evaluator
 from torchdet3d.trainer import Trainer
-from torchdet3d.utils import read_py_config, Logger
+from torchdet3d.utils import read_py_config, Logger, set_random_seed
 
 
 def main():
@@ -26,9 +26,10 @@ def main():
     cfg = read_py_config(args.config)
 
     # translate output to log file
-    log_name = 'train.log'
+    log_name = 'train.log' if cfg.regime == 'training' else 'test.log'
     log_name += time.strftime('-%Y-%m-%d-%H-%M-%S')
     sys.stdout = Logger(osp.join(cfg.output_dir, log_name))
+    set_random_seed(5)
 
     # init main components
     net = mobilenetv3_large(pretrained=cfg.model.pretrained, num_classes=cfg.model.num_classes, resume=cfg.model.load_weights)
@@ -46,6 +47,7 @@ def main():
                       train_loader=train_loader,
                       optimizer=optimizer,
                       criterions=criterions,
+                      losses_coeffs=cfg.loss.coeffs,
                       writer=writer,
                       max_epoch=cfg.data.max_epochs,
                       log_path=cfg.output_dir,
@@ -63,13 +65,16 @@ def main():
                           path_to_save_imgs=cfg.output_dir,
                           debug=cfg.debug_mode)
     # main loop
-    if cfg.regime == "evaluation":
-        evaluator.run_eval_pipe()
+    if cfg.regime.type == "evaluation":
+        evaluator.run_eval_pipe(cfg.regime.vis_only)
     else:
-        assert cfg.regime == "training"
+        assert cfg.regime.type == "training"
         for epoch in range(cfg.data.max_epochs):
             trainer.train(epoch)
-            scheduler.step()
+            if (cfg.scheduler.name == 'exp' and epoch < 5):
+                pass
+            else:
+                scheduler.step()
             evaluator.val(epoch)
         evaluator.visual_test()
 

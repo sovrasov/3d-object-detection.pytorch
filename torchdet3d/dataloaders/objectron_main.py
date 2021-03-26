@@ -14,8 +14,9 @@ from objectron.dataset import graphics
 
 
 class Objectron(Dataset):
-    def __init__(self, root_folder, mode='train', transform=None, debug_mode=False):
+    def __init__(self, root_folder, mode='train', transform=None, debug_mode=False, name=''):
         self.root_folder = root_folder
+        self.name=name
         self.transform = transform
         self.debug_mode = debug_mode
         self.mode = mode
@@ -52,11 +53,12 @@ class Objectron(Dataset):
         # transform raw key points to this representation
         unnormalized_keypoints = np.array(raw_keypoints).reshape(9, 2)
         # "print" image after crop with keypoints if needed
+
         if self.debug_mode:
-            draw_kp(image, unnormalized_keypoints, 'image_before_pipeline.jpg',
+            draw_kp(image, unnormalized_keypoints, f'image_before_pipeline_{self.name}.jpg',
                     normalized=False, RGB=False)
         # given unnormalized keypoints crop object on image
-        cropped_keypoints, cropped_img = self.crop(image, unnormalized_keypoints)
+        cropped_keypoints, cropped_img, crop_cords = self.crop(image, unnormalized_keypoints)
 
         # do augmentations with keypoints
         if self.transform:
@@ -67,16 +69,17 @@ class Objectron(Dataset):
                     isinstance(transformed_image, torch.Tensor) and
                     isinstance(transformed_keypoints, torch.Tensor))
         else:
-            transformed_image, transformed_keypoints = image, cropped_keypoints
+            transformed_image, transformed_keypoints = cropped_img, cropped_keypoints
         # "print" image after crop with keypoints if needed
         if self.debug_mode:
-            draw_kp(unnormalize_img(transformed_image).numpy(), transformed_keypoints.numpy(), 'image_after_pipeline.jpg')
+            draw_kp(unnormalize_img(transformed_image).numpy(), transformed_keypoints.numpy(), f'image_after_pipeline_{self.name}.jpg')
 
         if self.mode == 'test':
             return (image,
                     transformed_image,
                     transformed_keypoints,
-                    category)
+                    category,
+                    crop_cords)
 
         return transformed_image, transformed_keypoints, category
 
@@ -94,9 +97,10 @@ class Objectron(Dataset):
         x1 = self.clamp(max(clipped_bb[:,0]) + 10, 0, real_w)
         y1 = self.clamp(max(clipped_bb[:,1]) + 10, 0, real_h)
 
+        crop_cords = (x0,y0,x1,y1)
         # prepare transformation for image cropping and kp shifting
         transform_crop = A.Compose([
-                        A.Crop(x0,y0,x1,y1),
+                        A.Crop(*crop_cords),
                         ], keypoint_params=A.KeypointParams(format='xy'))
         # do actual crop and kp shift
         transformed = transform_crop(
@@ -108,7 +112,7 @@ class Objectron(Dataset):
         bb = transformed['keypoints']
         assert len(bb) == 9
 
-        return bb, crop_img
+        return bb, crop_img, crop_cords
 
     def clip_bb(self, bbox, w, h):
         ''' clip offset bbox coordinates
@@ -128,7 +132,7 @@ class Objectron(Dataset):
 def test():
     "Perform dataloader test"
     def super_vision_test(root, mode='val', transform=None, index=7):
-        ds = Objectron(root, mode=mode, transform=transform, debug_mode=True)
+        ds = Objectron(root, mode=mode, transform=transform, debug_mode=True, name=str(index))
         _, bbox, _ = ds[index]
         assert bbox.shape == (9,2)
 
@@ -144,17 +148,20 @@ def test():
         assert img_tensor.shape == (batch_size, 3, 290, 290)
         assert bbox.shape == (batch_size, 9, 2)
 
-    root = 'data_cereal_box'
+    root = './data_book'
     normalize = A.augmentations.transforms.Normalize(**dict(mean=[0.5931, 0.4690, 0.4229],
                                                             std=[0.2471, 0.2214, 0.2157]))
     transform = A.Compose([ ConvertColor(),
                             A.Resize(290, 290),
                             A.RandomBrightnessContrast(p=0.2),
+                            A.HorizontalFlip(p=0.5),
+                            A.augmentations.transforms.ISONoise(color_shift=(0.15,0.35),
+                                                                intensity=(0.2, 0.5), p=0.2),
                             normalize,
                             ToTensor((290, 290)),
                           ],keypoint_params=A.KeypointParams(format='xy'))
-
-    super_vision_test(root, mode='train', transform=transform, index=1540)
+    for index in np.random.randint(0,60000,20):
+        super_vision_test(root, mode='train', transform=transform, index=index)
     dataset_test(root, mode='val', transform=transform, batch_size=256)
     dataset_test(root, mode='train', transform=transform, batch_size=256)
 

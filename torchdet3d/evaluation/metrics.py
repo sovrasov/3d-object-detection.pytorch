@@ -2,8 +2,8 @@ import torch
 
 def compute_average_distance(pred_box, gt_box, num_keypoint=9):
     """Computes Average Distance (ADD) metric."""
-    detached_pred_box = pred_box.detach().view(pred_box.size(0), num_keypoint, 2)
-    detached_gt_box = gt_box.detach().view(pred_box.size(0), num_keypoint, 2)
+    detached_pred_box = pred_box.detach()
+    detached_gt_box = gt_box.detach()
     add_distance = 0.
     # compute
     add_distance = torch.mean(torch.linalg.norm(detached_pred_box - detached_gt_box, dim=2))
