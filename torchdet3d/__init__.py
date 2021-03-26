@@ -7,7 +7,7 @@ module_path='/home/prokofiev/3D-object-recognition/3rdparty/Objectron'
 if module_path not in sys.path:
     sys.path.append(module_path)
 
-from torchdet3d import builders, evaluation, dataloaders, trainer, models, utils
+from torchdet3d import builders, evaluation, dataloaders, trainer, models, utils, losses
 from .version import __version__
 
 __author__ = 'Sovrasov Vladislav, Prokofiev Kirill'

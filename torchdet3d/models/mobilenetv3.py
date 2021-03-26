@@ -158,6 +158,11 @@ class MobileNetV3(nn.Module):
         output_channel = _make_divisible(output_channel[mode] * width_mult, 8) if width_mult > 1.0 else output_channel[mode]
 
         self.regressors = nn.ModuleList()
+        # self.regressors = nn.Sequential(
+        #     nn.Linear(exp_size, output_channel),
+        #     h_swish(),
+        #     nn.Linear(output_channel, self.num_points),
+        # )
         for trg_id, trg_num_classes in enumerate(range(self.num_classes)):
             self.regressors.append(self._init_regressors(exp_size, output_channel))
 
@@ -176,6 +181,7 @@ class MobileNetV3(nn.Module):
         x = self.conv(x)
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
+        # kp = self.regressors(x)
         if self.num_classes == 1:
             # to save time
             kp = self.regressors[0](x)

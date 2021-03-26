@@ -15,12 +15,12 @@ data_parallel = dict(use_parallel=True,
 
 optim = dict(name='sgd', lr=0.01, momentum=0.9, wd=5e-4, betas=(0.9, 0.999), rho=0.9, alpha=0.99)
 
-scheduler = dict(name='cosine')
+scheduler = dict(name='cosine', gamma=0.1, exp_gamma=0.965, steps=[50])
 
-loss=dict(names=['smoothl1', 'cross_entropy'])
+loss=dict(names=['smoothl1', 'cross_entropy'], lam=1., coeffs=([1.],[.2]))
 
 output_dir = './output/exp_2'
 
 debug_mode = False
 
-regime = 'training'
+regime = dict(type='training', vis_only=False)
