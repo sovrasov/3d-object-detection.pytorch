@@ -7,7 +7,7 @@ from icecream import ic
 from  torchdet3d.utils import load_pretrained_weights
 
 
-__all__ = ['mobilenetv3_large', 'mobilenetv3_small']
+__all__ = ['mobilenetv3_large', 'mobilenetv3_small', 'MobileNetV3']
 
 pretrained_urls = {
     'mobilenetv3_small':
@@ -153,22 +153,17 @@ class MobileNetV3(nn.Module):
         self.features = nn.Sequential(*layers)
         # building last several layers
         self.conv = conv_1x1_bn(input_channel, exp_size)
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         output_channel = {'large': 1280, 'small': 1024}
         output_channel = _make_divisible(output_channel[mode] * width_mult, 8) if width_mult > 1.0 else output_channel[mode]
-
+        self.conv_head = Conv2d(exp_size, output_channel, kernel_size=1, bias=False)
+        self.bn_head = nn.BatchNorm2d(num_features=output_channel)
+        self.non_linearity = h_swish()
         self.regressors = nn.ModuleList()
-        # self.regressors = nn.Sequential(
-        #     nn.Linear(exp_size, output_channel),
-        #     h_swish(),
-        #     nn.Linear(output_channel, self.num_points),
-        # )
+
         for trg_id, trg_num_classes in enumerate(range(self.num_classes)):
-            self.regressors.append(self._init_regressors(exp_size, output_channel))
+            self.regressors.append(self._init_fc(output_channel))
 
         self.classifier = nn.Sequential(
-            nn.Linear(exp_size, output_channel),
-            h_swish(),
             nn.Dropout(0.5),
             nn.Linear(output_channel, self.num_classes),
         )
@@ -179,6 +174,8 @@ class MobileNetV3(nn.Module):
     def forward(self, x, cats):
         x = self.features(x)
         x = self.conv(x)
+        x = self.conv_head(x)
+        x = self.non_linearity(self.bn_head(x))
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
         # kp = self.regressors(x)
@@ -190,6 +187,12 @@ class MobileNetV3(nn.Module):
         kp = self.sigmoid(kp)
         targets = self.classifier(x) if self.num_classes > 1 else torch.zeros(kp.size(0), self.num_classes).to(x.device)
         return kp.view(x.size(0), self.num_points // 2, 2), targets
+
+    def  extract_features(self, x):
+        x = self.features(x)
+        x = self.conv(x)
+
+        return x
 
     def _initialize_weights(self):
         for m in self.modules():
@@ -206,12 +209,8 @@ class MobileNetV3(nn.Module):
                 if m.bias is not None:
                     m.bias.data.zero_()
 
-    def _init_regressors(self, exp_size, output_channel):
-        return nn.Sequential(
-            nn.Linear(exp_size, output_channel),
-            h_swish(),
-            nn.Linear(output_channel, self.num_points),
-        )
+    def _init_fc(self, exp_size):
+        return nn.Linear(output_channel, self.num_points)
 
 def init_pretrained_weights(model, key=''):
     """Initializes model with pretrained weights.
