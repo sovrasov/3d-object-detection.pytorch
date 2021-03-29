@@ -7,7 +7,7 @@ from icecream import ic
 from  torchdet3d.utils import load_pretrained_weights
 
 
-__all__ = ['mobilenetv3_large', 'mobilenetv3_small', 'MobileNetV3']
+__all__ = ['mobilenetv3_large', 'mobilenetv3_small', 'MobileNetV3', 'init_pretrained_weights']
 
 pretrained_urls = {
     'mobilenetv3_small':
@@ -155,7 +155,7 @@ class MobileNetV3(nn.Module):
         self.conv = conv_1x1_bn(input_channel, exp_size)
         output_channel = {'large': 1280, 'small': 1024}
         output_channel = _make_divisible(output_channel[mode] * width_mult, 8) if width_mult > 1.0 else output_channel[mode]
-        self.conv_head = Conv2d(exp_size, output_channel, kernel_size=1, bias=False)
+        self.conv_head = nn.Conv2d(exp_size, output_channel, kernel_size=1, bias=False)
         self.bn_head = nn.BatchNorm2d(num_features=output_channel)
         self.non_linearity = h_swish()
         self.regressors = nn.ModuleList()
@@ -191,6 +191,8 @@ class MobileNetV3(nn.Module):
     def  extract_features(self, x):
         x = self.features(x)
         x = self.conv(x)
+        x = self.conv_head(x)
+        x = self.non_linearity(self.bn_head(x))
 
         return x
 
@@ -209,7 +211,7 @@ class MobileNetV3(nn.Module):
                 if m.bias is not None:
                     m.bias.data.zero_()
 
-    def _init_fc(self, exp_size):
+    def _init_fc(self, output_channel):
         return nn.Linear(output_channel, self.num_points)
 
 def init_pretrained_weights(model, key=''):
