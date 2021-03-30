@@ -89,7 +89,6 @@ class Trainer:
         regress_loss = []
         for k, cr in zip(reg_coeffs, reg_criterions):
             regress_loss.append(cr(pred_kp, gt_kp) * k)
-        ic(regress_loss)
         return sum(regress_loss) + sum(class_loss)
 
     @staticmethod

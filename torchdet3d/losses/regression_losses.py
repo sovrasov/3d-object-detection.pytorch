@@ -20,7 +20,6 @@ class DiagLoss(_Loss):
         diag_tr = torch.sqrt((x1_tr - x0_tr)**2 + (y1_tr - y0_tr)**2)
 
         diag_diff = self.l1_loss(diag_pr, diag_tr)
-        ic(diag_diff)
 
         return diag_diff
 
