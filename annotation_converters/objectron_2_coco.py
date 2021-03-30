@@ -214,9 +214,9 @@ def main():
     for k in data_info:
         print('Converting ' + k)
         stat = save_2_coco(args.output_folder, k, data_info[k], args.obj_classes,
-                           args.fps_divisor, args.res_divisor, not args.only_annotation, ['shoe'])
-        for s in stat:
-            print(f'{s}: {stat[s]}')
+                           args.fps_divisor, args.res_divisor, not args.only_annotation, ['shoe', 'bike'])
+        for k in stat:
+            print(f'{k}: {stat[k]}')
 
 
 if __name__ == '__main__':

@@ -7,7 +7,7 @@ from icecream import ic
 from  torchdet3d.utils import load_pretrained_weights
 
 
-__all__ = ['mobilenetv3_large', 'mobilenetv3_small', 'MobileNetV3', 'init_pretrained_weights']
+__all__ = ['mobilenetv3_large', 'mobilenetv3_small', 'MobileNetV3', 'init_pretrained_weights', 'model_params']
 
 pretrained_urls = {
     'mobilenetv3_small':
@@ -15,6 +15,40 @@ pretrained_urls = {
     'mobilenetv3_large':
     'https://github.com/d-li14/mobilenetv3.pytorch/blob/master/pretrained/mobilenetv3-large-1cd25616.pth?raw=true',
 }
+
+model_params = dict(
+    mobilenetv3_large=dict(cfgs = [
+        # k, t, c, SE, HS, s
+        [3,   1,  16, 0, 0, 1],
+        [3,   4,  24, 0, 0, 2],
+        [3,   3,  24, 0, 0, 1],
+        [5,   3,  40, 1, 0, 2],
+        [5,   3,  40, 1, 0, 1],
+        [5,   3,  40, 1, 0, 1],
+        [3,   6,  80, 0, 1, 2],
+        [3, 2.5,  80, 0, 1, 1],
+        [3, 2.3,  80, 0, 1, 1],
+        [3, 2.3,  80, 0, 1, 1],
+        [3,   6, 112, 1, 1, 1],
+        [3,   6, 112, 1, 1, 1],
+        [5,   6, 160, 1, 1, 2],
+        [5,   6, 160, 1, 1, 1],
+        [5,   6, 160, 1, 1, 1]
+    ], mode='large'),
+    mobilenetv3_small=dict(cfgs = [
+        # k, t, c, SE, HS, s
+        [3,    1,  16, 1, 0, 2],
+        [3,  4.5,  24, 0, 0, 2],
+        [3, 3.67,  24, 0, 0, 1],
+        [5,    4,  40, 1, 1, 2],
+        [5,    6,  40, 1, 1, 1],
+        [5,    6,  40, 1, 1, 1],
+        [5,    3,  48, 1, 1, 1],
+        [5,    3,  48, 1, 1, 1],
+        [5,    6,  96, 1, 1, 2],
+        [5,    6,  96, 1, 1, 1],
+        [5,    6,  96, 1, 1, 1],
+    ], mode='small' ))
 
 def _make_divisible(v, divisor, min_value=None):
     """
@@ -259,26 +293,8 @@ def mobilenetv3_large(pretrained=False, resume='', **kwargs):
     """
     Constructs a MobileNetV3-Large model
     """
-    cfgs = [
-        # k, t, c, SE, HS, s
-        [3,   1,  16, 0, 0, 1],
-        [3,   4,  24, 0, 0, 2],
-        [3,   3,  24, 0, 0, 1],
-        [5,   3,  40, 1, 0, 2],
-        [5,   3,  40, 1, 0, 1],
-        [5,   3,  40, 1, 0, 1],
-        [3,   6,  80, 0, 1, 2],
-        [3, 2.5,  80, 0, 1, 1],
-        [3, 2.3,  80, 0, 1, 1],
-        [3, 2.3,  80, 0, 1, 1],
-        [3,   6, 112, 1, 1, 1],
-        [3,   6, 112, 1, 1, 1],
-        [5,   6, 160, 1, 1, 2],
-        [5,   6, 160, 1, 1, 1],
-        [5,   6, 160, 1, 1, 1]
-    ]
-
-    net = MobileNetV3(cfgs, mode='large', width_mult = 1., **kwargs)
+    params = model_params['mobilenetv3_large']
+    net = MobileNetV3(params['cfgs'], mode=params['mode'], width_mult = 1., **kwargs)
     if resume:
         load_pretrained_weights(net, resume)
     elif pretrained:
@@ -290,21 +306,8 @@ def mobilenetv3_small(pretrained=False, resume='', **kwargs):
     """
     Constructs a MobileNetV3-Small model
     """
-    cfgs = [
-        # k, t, c, SE, HS, s
-        [3,    1,  16, 1, 0, 2],
-        [3,  4.5,  24, 0, 0, 2],
-        [3, 3.67,  24, 0, 0, 1],
-        [5,    4,  40, 1, 1, 2],
-        [5,    6,  40, 1, 1, 1],
-        [5,    6,  40, 1, 1, 1],
-        [5,    3,  48, 1, 1, 1],
-        [5,    3,  48, 1, 1, 1],
-        [5,    6,  96, 1, 1, 2],
-        [5,    6,  96, 1, 1, 1],
-        [5,    6,  96, 1, 1, 1],
-    ]
-    net = MobileNetV3(cfgs, mode='small', width_mult = 1., **kwargs)
+    params = model_params['mobilenetv3_small']
+    net = MobileNetV3(params["cfgs"], mode=params['mode'], width_mult = 1., **kwargs)
     if resume:
         load_pretrained_weights(net, resume)
     if pretrained:
