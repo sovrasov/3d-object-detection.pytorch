@@ -8,14 +8,13 @@ from efficientnet_lite_pytorch import EfficientNet
 from efficientnet_lite_pytorch.utils import get_model_params
 from efficientnet_lite0_pytorch_model import EfficientnetLite0ModelFile
 
-from torchdet3d.models import mobilenetv3_large, MobileNetV3, init_pretrained_weights
+from torchdet3d.models import mobilenetv3_large, MobileNetV3, init_pretrained_weights, model_params
 from  torchdet3d.utils import load_pretrained_weights
 
 def build_model(cfg):
     if cfg.model.name.startswith('efficientnet'):
         weights_path = EfficientnetLite0ModelFile.get_model_file_path()
         blocks_args, global_params = get_model_params(cfg.model.name, override_params=None)
-        kwargs = dict()
         model = model_wraper(model_class=EfficientNet,
                              num_classes=cfg.model.num_classes,
                              blocks_args=blocks_args,
@@ -24,40 +23,24 @@ def build_model(cfg):
         if cfg.model.pretrained:
             load_pretrained_weights(model, weights_path)
 
-    elif cfg.model.name == 'mobilenet_v3':
-            kwargs = dict(cfgs= [
-        # k, t, c, SE, HS, s
-        [3,   1,  16, 0, 0, 1],
-        [3,   4,  24, 0, 0, 2],
-        [3,   3,  24, 0, 0, 1],
-        [5,   3,  40, 1, 0, 2],
-        [5,   3,  40, 1, 0, 1],
-        [5,   3,  40, 1, 0, 1],
-        [3,   6,  80, 0, 1, 2],
-        [3, 2.5,  80, 0, 1, 1],
-        [3, 2.3,  80, 0, 1, 1],
-        [3, 2.3,  80, 0, 1, 1],
-        [3,   6, 112, 1, 1, 1],
-        [3,   6, 112, 1, 1, 1],
-        [5,   6, 160, 1, 1, 2],
-        [5,   6, 160, 1, 1, 1],
-        [5,   6, 160, 1, 1, 1]
-    ], mode='large')
-            model = model_wraper(model_class=MobileNetV3, num_classes=cfg.model.num_classes, **kwargs)
+    elif cfg.model.name == 'mobilenetv3_large':
+            params = model_params['mobilenetv3_large']
+            model = model_wraper(model_class=MobileNetV3, num_classes=cfg.model.num_classes, **params)
             if cfg.model.pretrained:
                 init_pretrained_weights(model, key='mobilenetv3_large')
-            # model = mobilenetv3_large(pretrained=cfg.model.pretrained, num_classes=cfg.model.num_classes, resume=cfg.model.load_weights)
+
+    elif cfg.model.name == 'mobilenetv3_small':
+            params = model_params['mobilenetv3_small']
+            model = model_wraper(model_class=MobileNetV3, num_classes=cfg.model.num_classes, **params)
+            if cfg.model.pretrained:
+                init_pretrained_weights(model, key='mobilenetv3_small')
 
     return model
 
 def model_wraper(model_class, num_points=18, num_classes=1, pooling_mode='avg', **kwargs):
     class ModelWrapper(model_class):
         def __init__(self, output_channel=1280,**kwargs):
-            # if block_args and global_params:
-            #     super().__init__(**kwargs)
-            # else:
             super().__init__(**kwargs)
-
             self.regressors = nn.ModuleList()
             for trg_id, trg_num_classes in enumerate(range(num_classes)):
                 self.regressors.append(self._init_regressors(output_channel))
