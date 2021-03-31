@@ -34,7 +34,6 @@ class Trainer:
         loop = tqdm(enumerate(self.train_loader), total=len(self.train_loader), leave=False)
         for it, (imgs, gt_kp, gt_cats) in loop:
             # put image and keypoints on the appropriate device
-            ic(self.device)
             imgs, gt_kp, gt_cats = self.put_on_device([imgs, gt_kp, gt_cats], self.device)
             # compute output and loss
             pred_kp, pred_cats = self.model(imgs, gt_cats)

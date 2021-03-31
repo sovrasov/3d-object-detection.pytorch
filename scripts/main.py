@@ -34,7 +34,7 @@ def main():
     log_name = 'train.log' if cfg.regime == 'training' else 'test.log'
     log_name += time.strftime('-%Y-%m-%d-%H-%M-%S')
     sys.stdout = Logger(osp.join(cfg.output_dir, log_name))
-    set_random_seed(5)
+    set_random_seed(cfg.random_seeds)
 
     # init main components
     net = mobilenetv3_large(pretrained=cfg.model.pretrained, num_classes=cfg.model.num_classes, resume=cfg.model.load_weights)
@@ -76,9 +76,7 @@ def main():
         assert cfg.regime.type == "training"
         for epoch in range(cfg.data.max_epochs):
             trainer.train(epoch)
-            if (cfg.scheduler.name == 'exp' and epoch < 5):
-                pass
-            else:
+            if scheduler is not None:
                 scheduler.step()
             evaluator.val(epoch)
         evaluator.visual_test()
