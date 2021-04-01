@@ -101,7 +101,7 @@ class Trainer:
         if class_criterions:
             class_loss = []
             for k, cr in zip(class_coeffs, class_criterions):
-                class_loss.append(cr(pred_kp, gt_kp) * k)
+                class_loss.append(cr(pred_cats, gt_cats) * k)
         else:
             class_loss = torch.zeros(1, requires_grad=True)
 
