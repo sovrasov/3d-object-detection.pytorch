@@ -19,6 +19,9 @@ class Trainer:
     device : str ='cuda'
     save_chkpt: bool = True
     debug: bool = False
+    debug_steps: int = 30
+    save_freq: int = 10
+    print_freq: int = 10
     train_step: int = 0
 
     def train(self, epoch):
@@ -31,7 +34,9 @@ class Trainer:
 
         # switch to train mode and train one epoch
         self.model.train()
-        loop = tqdm(enumerate(self.train_loader), total=len(self.train_loader), leave=False)
+        self.num_iters = len(self.train_loader)
+
+        loop = tqdm(enumerate(self.train_loader), total=self.num_iters, leave=False)
         for it, (imgs, gt_kp, gt_cats) in loop:
             # put image and keypoints on the appropriate device
             imgs, gt_kp, gt_cats = self.put_on_device([imgs, gt_kp, gt_cats], self.device)
@@ -61,16 +66,31 @@ class Trainer:
             loop.set_description(f'Epoch [{epoch}/{self.max_epoch}]')
             loop.set_postfix(loss=loss.item(), avr_loss = losses.avg,
                              ADD=ADD, avr_ADD=ADD_meter.avg, SADD=SADD,
-                             avr_SADD=SADD_meter.avg, acc=acc, lr=self.optimizer.param_groups[0]['lr'], acc_avg = ACC_meter.avg)
-
-            if self.debug and it == 10:
+                             avr_SADD=SADD_meter.avg, acc=acc,  acc_avg = ACC_meter.avg, lr=self.optimizer.param_groups[0]['lr'])
+            if ((it % self.print_freq == 0) or (it == self.num_iters-1)):
+                print(
+                        'epoch: [{0}/{1}][{2}/{3}]\t'
+                        'cls acc {accuracy.val:.3f} ({accuracy.avg:.3f})\t'
+                        'ADD {ADD.val:.4f} ({ADD.avg:.4f})\t'
+                        'SADD {SADD.val:.4f} ({SADD.avg:.4f})\t'
+                        'loss {losses.avg:.5f}\t'
+                        'lr {lr:.6f}'.format(
+                            epoch,
+                            self.max_epoch,
+                            it,
+                            self.num_iters,
+                            accuracy=ACC_meter,
+                            ADD=ADD_meter,
+                            SADD=SADD_meter,
+                            losses=losses,
+                            lr=self.optimizer.param_groups[0]['lr'])
+                        )
+            if (self.debug and it == self.debug_steps):
                 break
 
-        if self.save_chkpt:
+        # save every 10 epoch
+        if self.save_chkpt and self.save_freq % 10 == 0 and not self.debug:
             save_snap(self.model, self.optimizer, epoch, self.log_path)
-
-        print(f"\ntrain: epoch: {epoch}, ADD: {ADD_meter.avg},"
-              f" SADD: {SADD_meter.avg}, loss: {losses.avg}, accuracy: {ACC_meter.avg}")
 
     def parse_losses(self, pred_kp, gt_kp, pred_cats, gt_cats):
         reg_criterions, class_criterions = self.criterions

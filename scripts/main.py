@@ -31,13 +31,13 @@ def main():
     cfg = read_py_config(args.config)
 
     # translate output to log file
-    log_name = 'train.log' if cfg.regime == 'training' else 'test.log'
+    log_name = 'train.log' if cfg.regime.type == 'training' else 'test.log'
     log_name += time.strftime('-%Y-%m-%d-%H-%M-%S')
     sys.stdout = Logger(osp.join(cfg.output_dir, log_name))
-    set_random_seed(cfg.random_seeds)
+    set_random_seed(cfg.utils.random_seeds)
 
     # init main components
-    net = mobilenetv3_large(pretrained=cfg.model.pretrained, num_classes=cfg.model.num_classes, resume=cfg.model.load_weights)
+    net = build_model(cfg)
     net.to(args.device)
     if (torch.cuda.is_available() and args.device == 'cuda' and cfg.data_parallel.use_parallel):
         net = torch.nn.DataParallel(net, **cfg.data_parallel.parallel_params)
@@ -58,7 +58,10 @@ def main():
                       log_path=cfg.output_dir,
                       device=args.device,
                       save_chkpt=args.save_checkpoint,
-                      debug=cfg.debug_mode)
+                      debug=cfg.utils.debug_mode,
+                      debug_steps=cfg.utils.debug_steps,
+                      save_freq=cfg.utils.save_freq,
+                      print_freq=cfg.utils.print_freq)
 
     evaluator = Evaluator(model=net,
                           val_loader=val_loader,
@@ -68,7 +71,8 @@ def main():
                           device=args.device,
                           max_epoch=cfg.data.max_epochs,
                           path_to_save_imgs=cfg.output_dir,
-                          debug=cfg.debug_mode)
+                          debug=cfg.utils.debug_mode,
+                          debug_steps=cfg.utils.debug_steps)
     # main loop
     if cfg.regime.type == "evaluation":
         evaluator.run_eval_pipe(cfg.regime.vis_only)

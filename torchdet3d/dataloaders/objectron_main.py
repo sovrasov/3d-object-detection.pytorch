@@ -1,6 +1,6 @@
 ''' Parse objectron data to PyTorch dataloader. Cereal box for now only with shuffled images.'''
 from pathlib import Path
-import os
+
 from torch.utils.data import Dataset, DataLoader
 import torch
 import cv2 as cv
@@ -16,7 +16,7 @@ from objectron.dataset import graphics
 
 
 class Objectron(Dataset):
-    def __init__(self, root_folder, mode='train', transform=None, debug_mode=False, name=''):
+    def __init__(self, root_folder, mode='train', transform=None, debug_mode=False, name='0', category_list='all'):
         self.root_folder = root_folder
         self.name=name
         self.transform = transform
@@ -38,16 +38,27 @@ class Objectron(Dataset):
         else:
             raise RuntimeError("Unknown dataset mode")
 
+        # filter categories
+        if not category_list == 'all':
+            self.annotations = list(filter(lambda x: x['category_id'] in category_list, self.ann['annotations']))
+            images_id = {ann_obj['image_id'] for ann_obj in self.annotations}
+            # create dict since ordering now different
+            self.images = {img_obj['id']: img_obj for img_obj in filter(lambda x: x['id'] in images_id, self.ann['images'])}
+            assert len(self.images) == len(images_id)
+        else:
+            self.annotations = self.ann['annotations']
+            self.images = self.ann['images']
+
     def __len__(self):
-        return len(self.ann['annotations'])
+        return len(self.annotations)
 
     def __getitem__(self, indx):
         # get path to image from annotations
-        raw_keypoints = self.ann['annotations'][indx]['keypoints']
-        img_id = self.ann['annotations'][indx]['image_id']
-        category = int(self.ann['annotations'][indx]['category_id']) - 1
+        raw_keypoints = self.annotations[indx]['keypoints']
+        img_id = self.annotations[indx]['image_id']
+        category = int(self.annotations[indx]['category_id']) - 1
         # get raw key points for bb from annotations
-        img_path = self.root_folder + '/' + (self.ann['images'][img_id]['file_name'])
+        img_path = self.root_folder + '/' + (self.images[img_id]['file_name'])
         # read image
         image = cv.imread(img_path)
         assert image is not None
@@ -74,7 +85,8 @@ class Objectron(Dataset):
             transformed_image, transformed_keypoints = cropped_img, cropped_keypoints
         # "print" image after crop with keypoints if needed
         if self.debug_mode:
-            draw_kp(unnormalize_img(transformed_image).numpy(), transformed_keypoints.numpy(), f'image_after_pipeline_{self.name}.jpg')
+            draw_kp(unnormalize_img(transformed_image).numpy(), transformed_keypoints.numpy(),
+                                    f'image_after_pipeline_{self.name}.jpg')
 
         if self.mode == 'test':
             return (image,
@@ -134,6 +146,9 @@ def test():
     "Perform dataloader test"
     def super_vision_test(root, mode='val', transform=None, index=7):
         ds = Objectron(root, mode=mode, transform=transform, debug_mode=True, name=str(index))
+        print(len(ds))
+        ds = Objectron(root, mode=mode, transform=transform, debug_mode=True, name=str(index), category_list=[1])
+        print(len(ds))
         _, bbox, _ = ds[index]
         assert bbox.shape == (9,2)
 
@@ -149,7 +164,7 @@ def test():
         assert img_tensor.shape == (batch_size, 3, 290, 290)
         assert bbox.shape == (batch_size, 9, 2)
 
-    root = './data_book'
+    root = './data_cereal_box'
     normalize = A.augmentations.transforms.Normalize(**dict(mean=[0.5931, 0.4690, 0.4229],
                                                             std=[0.2471, 0.2214, 0.2157]))
     transform = A.Compose([ ConvertColor(),
@@ -161,7 +176,7 @@ def test():
                             normalize,
                             ToTensor((290, 290)),
                           ],keypoint_params=A.KeypointParams(format='xy'))
-    for index in np.random.randint(0,60000,20):
+    for index in np.random.randint(0,60000,1):
         super_vision_test(root, mode='train', transform=transform, index=index)
     dataset_test(root, mode='val', transform=transform, batch_size=256)
     dataset_test(root, mode='train', transform=transform, batch_size=256)
