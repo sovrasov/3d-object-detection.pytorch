@@ -34,6 +34,7 @@ class Evaluator:
     num_samples: int = 10
     path_to_save_imgs: str = './testing_images'
     debug: bool = False
+    debug_steps: int = 30
     val_step: int = 0
 
     def visual_test(self):
@@ -102,16 +103,15 @@ class Evaluator:
                 loop.set_postfix(ADD=ADD, avr_ADD=ADD_meter.avg, SADD=SADD,
                                     avr_SADD=SADD_meter.avg, acc=acc, acc_avg = ACC_meter.avg)
 
-            if self.debug and it == 10:
+            if self.debug and it == self.debug_steps:
                 break
-        if epoch is not None:
-            print(f"val: epoch: {epoch}, ADD: {ADD_meter.avg},"
-                  f" SADD: {SADD_meter.avg}, accuracy: {ACC_meter.avg}")
-        else:
-            print(f"\nComputed test metrics:\n"
-                  f"ADD ---> {ADD_meter.avg}\n"
-                  f"SADD ---> {SADD_meter.avg}\n"
-                  f"classification accuracy ---> {ACC_meter.avg}")
+
+        ep_mess = f"epoch : {epoch}\n" if epoch is not None else f""
+        print(f"\nComputed val metrics:\n"
+              f"{ep_mess}"
+              f"ADD ---> {ADD_meter.avg}\n"
+              f"SADD ---> {SADD_meter.avg}\n"
+              f"classification accuracy ---> {ACC_meter.avg}")
 
     def run_eval_pipe(self, visual_only=False):
         print('.'*10,'Run evaluating protocol', '.'*10)

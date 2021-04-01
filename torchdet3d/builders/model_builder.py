@@ -7,15 +7,31 @@ import torch.nn.functional as F
 from efficientnet_lite_pytorch import EfficientNet
 from efficientnet_lite_pytorch.utils import get_model_params
 from efficientnet_lite0_pytorch_model import EfficientnetLite0ModelFile
+from efficientnet_lite1_pytorch_model import EfficientnetLite1ModelFile
+from efficientnet_lite2_pytorch_model import EfficientnetLite2ModelFile
 
 from torchdet3d.models import mobilenetv3_large, MobileNetV3, init_pretrained_weights, model_params
 from  torchdet3d.utils import load_pretrained_weights
 
+__AVAI_MODELS__ = {
+                    'mobilenetv3_large', 'mobilenetv3_small', 'efficientnet-lite0', 'efficientnet-lite1',
+                    'efficientnet-lite2',
+                  }
+
+EFFICIENT_NET_WEIGHTS = {
+                         'efficientnet-lite0' : EfficientnetLite0ModelFile.get_model_file_path(),
+                         'efficientnet-lite1' : EfficientnetLite1ModelFile.get_model_file_path(),
+                         'efficientnet-lite2' : EfficientnetLite2ModelFile.get_model_file_path()
+                         }
+
 def build_model(cfg):
+    assert cfg.model.name in __AVAI_MODELS__, f"Wrong model name parameter. Expected one of {__AVAI_MODELS__}"
+
     if cfg.model.name.startswith('efficientnet'):
-        weights_path = EfficientnetLite0ModelFile.get_model_file_path()
+        weights_path = EFFICIENT_NET_WEIGHTS[cfg.model.name]
         blocks_args, global_params = get_model_params(cfg.model.name, override_params=None)
         model = model_wraper(model_class=EfficientNet,
+                             output_channels=1280,
                              num_classes=cfg.model.num_classes,
                              blocks_args=blocks_args,
                              global_params=global_params)
@@ -25,21 +41,21 @@ def build_model(cfg):
 
     elif cfg.model.name == 'mobilenetv3_large':
             params = model_params['mobilenetv3_large']
-            model = model_wraper(model_class=MobileNetV3, num_classes=cfg.model.num_classes, **params)
+            model = model_wraper(model_class=MobileNetV3, output_channels=1280, num_classes=cfg.model.num_classes, **params)
             if cfg.model.pretrained:
                 init_pretrained_weights(model, key='mobilenetv3_large')
 
     elif cfg.model.name == 'mobilenetv3_small':
             params = model_params['mobilenetv3_small']
-            model = model_wraper(model_class=MobileNetV3, num_classes=cfg.model.num_classes, **params)
+            model = model_wraper(model_class=MobileNetV3, output_channels=1024, num_classes=cfg.model.num_classes, **params)
             if cfg.model.pretrained:
                 init_pretrained_weights(model, key='mobilenetv3_small')
 
     return model
 
-def model_wraper(model_class, num_points=18, num_classes=1, pooling_mode='avg', **kwargs):
+def model_wraper(model_class, output_channels, num_points=18, num_classes=1, pooling_mode='avg', **kwargs):
     class ModelWrapper(model_class):
-        def __init__(self, output_channel=1280,**kwargs):
+        def __init__(self, output_channel=output_channels, **kwargs):
             super().__init__(**kwargs)
             self.regressors = nn.ModuleList()
             for trg_id, trg_num_classes in enumerate(range(num_classes)):
@@ -75,10 +91,12 @@ def model_wraper(model_class, num_points=18, num_classes=1, pooling_mode='avg', 
         def forward(self, x, cats):
             features = self.extract_features(x)
             pooled_features = self._glob_feature_vector(features, mode=pooling_mode)
-            ic(pooled_features.shape, cats.shape)
             kp = torch.cat([self.regressors[id](sample) for id, sample in zip(cats, pooled_features)], 0)
             kp = self.sigmoid(kp)
-            targets = self.classifier(pooled_features) if num_classes > 1 else torch.zeros(kp.size(0), num_classes).to(x.device)
+            if num_classes > 1:
+                targets = self.classifier(pooled_features)
+            else:
+                targets = cats.unsqueeze(dim=1)
             return kp.view(x.size(0), num_points // 2, 2), targets
 
     model = ModelWrapper(**kwargs)
