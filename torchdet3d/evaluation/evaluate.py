@@ -21,6 +21,8 @@ if module_path not in sys.path:
     sys.path.append(module_path)
 from objectron.dataset import graphics
 
+OBJECTRON_CLASSES = ('bike', 'book', 'bottle', 'cereal_box', 'camera', 'chair', 'cup', 'laptop', 'shoe')
+
 @dataclass
 class Evaluator:
     model: object
@@ -68,7 +70,7 @@ class Evaluator:
 
             # draw key_points on original image
             pred_kp = self.transform_kp(pred_kp[0].detach().cpu().numpy(), crop_cords)
-            label = str(torch.argmax(pred_cat, dim=1).item())
+            label = OBJECTRON_CLASSES[torch.argmax(pred_cat, dim=1).item()]
             draw_kp(prefetch_img, pred_kp, f'{self.path_to_save_imgs}/tested_image_№_{idx}_predicted.jpg', RGB=False, normalized=False, label=label)
 
     def val(self, epoch=None):
