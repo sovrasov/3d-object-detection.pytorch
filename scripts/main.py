@@ -12,11 +12,14 @@ from torchdet3d.evaluation import Evaluator
 from torchdet3d.trainer import Trainer
 from torchdet3d.utils import read_py_config, Logger, set_random_seed
 
+def reset_config(cfg, args):
+    if args.root:
+        cfg['data']['root'] = args.root
 
 def main():
     # parse arguments
     parser = argparse.ArgumentParser(description='3D-object-detection training')
-    parser.add_argument('--root', type=str, default='./data', help='path to root folder')
+    parser.add_argument('--root', type=str, default='', help='path to root folder')
     parser.add_argument('--config', type=str, default='./configs/default_config.py', help='path to config')
     parser.add_argument('--device', type=str, default='cuda', choices=['cuda','cpu'],
                         help='choose device to train on')
@@ -24,7 +27,7 @@ def main():
                         help='whether or not to save your model')
     args = parser.parse_args()
     cfg = read_py_config(args.config)
-
+    reset_config(cfg, args)
     # translate output to log file
     log_name = 'train.log' if cfg.regime.type == 'training' else 'test.log'
     log_name += time.strftime('-%Y-%m-%d-%H-%M-%S')
