@@ -202,9 +202,9 @@ def main():
     subsets = ['train', 'test']
     data_info = {}
     for subset in subsets:
-        print(f'Loadning {subset} metadata...')
+        print(f'Loading {subset} metadata...')
         videos_info, avg_len = load_video_info(args.data_root, subset, args.obj_classes)
-        print(f'# of {subset} videos: {len(videos_info)}, avg lenght: {avg_len}')
+        print(f'# of {subset} videos: {len(videos_info)}, avg length: {avg_len}')
         data_info[subset] = videos_info
 
     for k in data_info.keys():
