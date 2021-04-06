@@ -10,7 +10,7 @@ from efficientnet_lite0_pytorch_model import EfficientnetLite0ModelFile
 from efficientnet_lite1_pytorch_model import EfficientnetLite1ModelFile
 from efficientnet_lite2_pytorch_model import EfficientnetLite2ModelFile
 
-from torchdet3d.models import mobilenetv3_large, MobileNetV3, init_pretrained_weights, model_params
+from torchdet3d.models import MobileNetV3, init_pretrained_weights, model_params
 from  torchdet3d.utils import load_pretrained_weights
 
 __AVAI_MODELS__ = {
@@ -24,7 +24,7 @@ EFFICIENT_NET_WEIGHTS = {
                          'efficientnet-lite2' : EfficientnetLite2ModelFile.get_model_file_path()
                          }
 
-def build_model(cfg):
+def build_model(cfg, export_mode=False):
     assert cfg.model.name in __AVAI_MODELS__, f"Wrong model name parameter. Expected one of {__AVAI_MODELS__}"
 
     if cfg.model.name.startswith('efficientnet'):
@@ -41,19 +41,22 @@ def build_model(cfg):
 
     elif cfg.model.name == 'mobilenetv3_large':
             params = model_params['mobilenetv3_large']
-            model = model_wraper(model_class=MobileNetV3, output_channels=1280, num_classes=cfg.model.num_classes, **params)
+            model = model_wraper(model_class=MobileNetV3, output_channels=1280,
+                                    num_classes=cfg.model.num_classes, export_mode=export_mode, **params)
             if cfg.model.pretrained:
                 init_pretrained_weights(model, key='mobilenetv3_large')
 
     elif cfg.model.name == 'mobilenetv3_small':
             params = model_params['mobilenetv3_small']
-            model = model_wraper(model_class=MobileNetV3, output_channels=1024, num_classes=cfg.model.num_classes, **params)
+            model = model_wraper(model_class=MobileNetV3, output_channels=1024,
+                                    num_classes=cfg.model.num_classes, export_mode=export_mode, **params)
             if cfg.model.pretrained:
                 init_pretrained_weights(model, key='mobilenetv3_small')
 
     return model
 
-def model_wraper(model_class, output_channels, num_points=18, num_classes=1, pooling_mode='avg', **kwargs):
+def model_wraper(model_class, output_channels, num_points=18,
+                    num_classes=1, pooling_mode='avg', export_mode=False, **kwargs):
     class ModelWrapper(model_class):
         def __init__(self, output_channel=output_channels, **kwargs):
             super().__init__(**kwargs)
@@ -88,7 +91,22 @@ def model_wraper(model_class, output_channels, num_points=18, num_classes=1, poo
                 return out.view(x.size(0), -1)
             return out
 
+        def forward_to_onnx(self, x):
+            ''' use trained classificator to predict object's class and
+                choose according head for this '''
+            features = self.extract_features(x)
+            pooled_features = self._glob_feature_vector(features, mode=pooling_mode)
+            if num_classes > 1:
+                targets = self.classifier(pooled_features)
+            else:
+                targets = torch.zeros((x.size(0)), dtype=torch.long)
+
+            kp = torch.cat([self.regressors[id](sample) for id, sample in zip(targets, pooled_features)], 0)
+
+            return kp.view(x.size(0), num_points // 2, 2)
+
         def forward(self, x, cats):
+            ''' ordinary forward for training '''
             features = self.extract_features(x)
             pooled_features = self._glob_feature_vector(features, mode=pooling_mode)
             kp = torch.cat([self.regressors[id](sample) for id, sample in zip(cats, pooled_features)], 0)
@@ -97,9 +115,12 @@ def model_wraper(model_class, output_channels, num_points=18, num_classes=1, poo
                 targets = self.classifier(pooled_features)
             else:
                 targets = cats.unsqueeze(dim=1)
-            return kp.view(x.size(0), num_points // 2, 2), targets
+
+            return (kp.view(x.size(0), num_points // 2, 2), targets)
 
     model = ModelWrapper(**kwargs)
+    if export_mode:
+        model.forward = model.forward_to_onnx
     return model
 
 def test(cfg):

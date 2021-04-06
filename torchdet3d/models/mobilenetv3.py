@@ -2,12 +2,11 @@ import math
 
 import torch
 import torch.nn as nn
-from icecream import ic
 
 from  torchdet3d.utils import load_pretrained_weights
 
 
-__all__ = ['mobilenetv3_large', 'mobilenetv3_small', 'MobileNetV3', 'init_pretrained_weights', 'model_params']
+__all__ = ['MobileNetV3', 'init_pretrained_weights', 'model_params']
 
 pretrained_urls = {
     'mobilenetv3_small':
@@ -170,8 +169,6 @@ class MobileNetV3(nn.Module):
         super().__init__()
         # setting of inverted residual blocks
         self.cfgs = cfgs
-        self.num_points = num_points
-        self.num_classes = num_classes
         assert mode in ['large', 'small']
 
         # building first layer
@@ -192,35 +189,8 @@ class MobileNetV3(nn.Module):
         self.conv_head = nn.Conv2d(exp_size, output_channel, kernel_size=1, bias=False)
         self.bn_head = nn.BatchNorm2d(num_features=output_channel)
         self.non_linearity = h_swish()
-        self.regressors = nn.ModuleList()
 
-        for trg_id, trg_num_classes in enumerate(range(self.num_classes)):
-            self.regressors.append(self._init_fc(output_channel))
-
-        self.classifier = nn.Sequential(
-            nn.Dropout(0.5),
-            nn.Linear(output_channel, self.num_classes),
-        )
-
-        self.sigmoid = nn.Sigmoid()
         self._initialize_weights()
-
-    def forward(self, x, cats):
-        x = self.features(x)
-        x = self.conv(x)
-        x = self.conv_head(x)
-        x = self.non_linearity(self.bn_head(x))
-        x = self.avgpool(x)
-        x = x.view(x.size(0), -1)
-        # kp = self.regressors(x)
-        if self.num_classes == 1:
-            # to save time
-            kp = self.regressors[0](x)
-        else:
-            kp = torch.cat([self.regressors[id](sample) for id, sample in zip(cats, x)], 0)
-        kp = self.sigmoid(kp)
-        targets = self.classifier(x) if self.num_classes > 1 else torch.zeros(kp.size(0), self.num_classes).to(x.device)
-        return kp.view(x.size(0), self.num_points // 2, 2), targets
 
     def  extract_features(self, x):
         x = self.features(x)
@@ -288,29 +258,3 @@ def init_pretrained_weights(model, key=''):
         gdown.download(pretrained_urls[key], cached_file)
 
     load_pretrained_weights(model, cached_file)
-
-def mobilenetv3_large(pretrained=False, resume='', **kwargs):
-    """
-    Constructs a MobileNetV3-Large model
-    """
-    params = model_params['mobilenetv3_large']
-    net = MobileNetV3(params['cfgs'], mode=params['mode'], width_mult = 1., **kwargs)
-    if resume:
-        load_pretrained_weights(net, resume)
-    elif pretrained:
-        init_pretrained_weights(net, key='mobilenetv3_large')
-
-    return net
-
-def mobilenetv3_small(pretrained=False, resume='', **kwargs):
-    """
-    Constructs a MobileNetV3-Small model
-    """
-    params = model_params['mobilenetv3_small']
-    net = MobileNetV3(params["cfgs"], mode=params['mode'], width_mult = 1., **kwargs)
-    if resume:
-        load_pretrained_weights(net, resume)
-    if pretrained:
-        init_pretrained_weights(net, key='mobilenetv3_small')
-
-    return net

@@ -1,4 +1,5 @@
 from subprocess import run, DEVNULL, CalledProcessError
+import argparse
 
 import torch
 import os
@@ -10,7 +11,8 @@ from torchdet3d.utils import load_pretrained_weights, read_py_config
 
 def export_onnx(model, snapshot_path, img_size=(128,128), save_path='model.onnx'):
     # input to inference model
-    dummy_input = torch.rand(size=(1,3,*img_size), device=device)
+    dummy_input = torch.rand(size=(1,3,*img_size))
+    dummy_cat = torch.zeros(1, dtype=torch.long)
     # load checkpoint from config
     load_pretrained_weights(model, snapshot_path)
     # convert model to onnx
@@ -18,15 +20,15 @@ def export_onnx(model, snapshot_path, img_size=(128,128), save_path='model.onnx'
     output_names = ["cls_bbox"]
     with torch.no_grad():
         model.eval()
-        torch.onnx.export(model, dummy_input, save_path, verbose=True,
+        torch.onnx.export(model, args=dummy_input, f=save_path, verbose=True,
                       input_names=input_names, output_names=output_names)
 
 def export_mo(onnx_model_path, mean_values, scale_values, save_path):
-    command_line = f'mo.py --input_model="{onnx_model_path}" '
+    command_line = (f'mo.py --input_model="{onnx_model_path}" '
                    f'--mean_values="{mean_values}" '
                    f'--scale_values="{scale_values}" '
                    f'--output_dir="{save_path}" '
-                   f'--reverse_input_channels '
+                   f'--reverse_input_channels ')
 
     try:
         run('mo.py -h', stdout=DEVNULL, stderr=DEVNULL, shell=True, check=True)
@@ -61,11 +63,13 @@ def main():
         snapshot_path = os.path.join(cfg.output_dir, snap)
     else:
         snapshot_path = args.model_torch_path
-    model = build_model(cfg)
+    model = build_model(cfg, export_mode=True)
 
     mean_values = str([s*255 for s in cfg.data.normalization.mean])
     scale_values = str([s*255 for s in cfg.data.normalization.std])
-
     export_onnx(model, snapshot_path, cfg.data.resize, args.model_onnx_path)
     if args.convert_mo:
         export_mo(args.model_onnx_path, mean_values, scale_values, args.model_mo_path)
+
+if __name__ == "__main__":
+    main()
