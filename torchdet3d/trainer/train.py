@@ -1,6 +1,4 @@
-import torch
 from tqdm import tqdm
-from icecream import ic
 from dataclasses import dataclass
 
 from torchdet3d.evaluation import compute_average_distance, compute_accuracy
@@ -33,7 +31,7 @@ class Trainer:
         reg_criterion, class_criterion = self.criterions
         loop = tqdm(enumerate(self.train_loader), total=len(self.train_loader), leave=False)
         for it, (imgs, gt_kp, gt_cats) in loop:
-            if any([obj is None for obj in (imgs, gt_kp, gt_cats)]):
+            if any(obj is None for obj in (imgs, gt_kp, gt_cats)):
                 continue
             # put image and keypoints on the appropriate device
             imgs = imgs.to(self.device)
@@ -77,4 +75,3 @@ class Trainer:
 
         print(f"train: epoch: {epoch}, ADD: {ADD_meter.avg},"
               f" SADD: {SADD_meter.avg}, loss: {losses.avg}, accuracy: {ACC_meter.avg}")
-
