@@ -12,8 +12,6 @@ import numpy as np
 import cv2 as cv
 import torch
 import warnings
-import torch
-import torch.nn as nn
 from attrdict import AttrDict as adict
 
 from objectron.dataset import graphics
@@ -194,7 +192,7 @@ def draw_kp(img, keypoints, name, normalized=True, RGB=True, num_keypoints=9):
     graphics.draw_annotation_on_image(img_copy, expanded_kp , [num_keypoints])
     cv.imwrite(name, img_copy)
 
-class AverageMeter(object):
+class AverageMeter:
     """Computes and stores the average and current value"""
     def __init__(self):
         self.reset()

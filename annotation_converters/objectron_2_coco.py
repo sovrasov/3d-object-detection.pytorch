@@ -7,7 +7,7 @@ from tqdm import tqdm
 import cv2 as cv
 import numpy as np
 
-from objectron_helpers import load_annotation_sequence, grab_frames, get_video_frames_number
+from objectron_helpers import load_annotation_sequence, grab_frames
 
 lists_root_path = osp.abspath(os.path.join(osp.dirname(__file__), '../3rdparty/Objectron/index'))
 
@@ -30,14 +30,17 @@ def load_video_info(data_root, subset, classes):
                 avg_vid_len += len(ann)
                 vid_path = osp.join(data_root, 'videos' + osp.sep + line.strip() + osp.sep + 'video.MOV')
                 videos_info.append((vid_path, ann))
+                if len(videos_info) > 2:
+                    break
 
     avg_vid_len /= len(videos_info)
     return videos_info, avg_vid_len
 
 
-def np_encoder(object):
-    if isinstance(object, np.generic):
-        return object.item()
+def np_encoder(obj):
+    if isinstance(obj, np.generic):
+        return obj.item()
+    return None
 
 
 def decode_keypoints(keypoints, keypoint_size_list, size):
@@ -81,7 +84,7 @@ def get_bboxes_from_keypoints(keypoints, num_objects, size, clip_bboxes=False):
 
 
 def save_2_coco(output_root, subset_name, data_info, obj_classes, fps_divisor,
-                res_divisor, dump_images=False, clip_classes=[]):
+                res_divisor, dump_images=False, clip_classes=[], debug=False):
     json_name = f'objectron_{subset_name}.json'
     ann_folder = osp.join(output_root, 'annotations')
     img_folder = osp.join(output_root, 'images')
@@ -121,7 +124,7 @@ def save_2_coco(output_root, subset_name, data_info, obj_classes, fps_divisor,
             keypoints = decode_keypoints(frame_ann[0], frame_ann[2], (w, h))
             num_objects = len(frame_ann[2])
             bboxes = get_bboxes_from_keypoints(keypoints, num_objects, (w, h),
-                                               clip_bboxes=True if frame_ann[1] in clip_classes else False)
+                                               clip_bboxes=frame_ann[1] in clip_classes)
             if bboxes is None:
                 continue
 
@@ -131,24 +134,25 @@ def save_2_coco(output_root, subset_name, data_info, obj_classes, fps_divisor,
             image_info['height'], image_info['width'] = h, w
             vid_name_idx = vid_path.find('batch-')
             image_info['file_name'] = osp.join('images',
-                    frame_ann[1] + '_' + vid_path[vid_name_idx : vid_path.rfind(osp.sep)].replace(osp.sep, '_') + '_' + str(frame_idx) + '.jpg')
+                    frame_ann[1] + '_' + vid_path[vid_name_idx : vid_path.rfind(osp.sep)].replace(osp.sep, '_') + \
+                    '_' + str(frame_idx) + '.jpg')
             images_info.append(image_info)
             stat['Total frames'] += 1
 
-            '''
-            #visual debug
-            frames[frame_idx] = cv.resize(frames[frame_idx], (w, h))
-            for kp_pixel in keypoints[0]:
-                cv.circle(frames[frame_idx], (kp_pixel[0], kp_pixel[1]), 5, (255, 0, 0), -1)
-            for kp_pixel in keypoints[1]:
-                cv.circle(frames[frame_idx], (kp_pixel[0], kp_pixel[1]), 5, (0, 0, 255), -1)
-            for bbox in bboxes:
-                if bbox is not None:
-                    cv.rectangle(frames[frame_idx], (bbox[0], bbox[1]), (bbox[0] + bbox[2], bbox[1] + bbox[3]), (0, 0, 255), 1)
-            cv.imwrite(osp.join(output_root, image_info['file_name']), frames[frame_idx])
-            '''
+            if debug:
+                # visual debug
+                frames[frame_idx] = cv.resize(frames[frame_idx], (w, h))
+                for kp_pixel in keypoints[0]:
+                    cv.circle(frames[frame_idx], (kp_pixel[0], kp_pixel[1]), 5, (255, 0, 0), -1)
+                for kp_pixel in keypoints[1]:
+                    cv.circle(frames[frame_idx], (kp_pixel[0], kp_pixel[1]), 5, (0, 0, 255), -1)
+                for bbox in bboxes:
+                    if bbox is not None:
+                        cv.rectangle(frames[frame_idx], (bbox[0], bbox[1]),
+                                    (bbox[0] + bbox[2], bbox[1] + bbox[3]), (0, 0, 255), 1)
+                cv.imwrite(osp.join(output_root, image_info['file_name']), frames[frame_idx])
 
-            if dump_images:
+            if dump_images and not debug:
                 frames[frame_idx] = cv.resize(frames[frame_idx], (w, h))
                 cv.imwrite(osp.join(output_root, image_info['file_name']), frames[frame_idx])
 
@@ -207,12 +211,12 @@ def main():
         print(f'# of {subset} videos: {len(videos_info)}, avg length: {avg_len}')
         data_info[subset] = videos_info
 
-    for k in data_info.keys():
+    for k in data_info:
         print('Converting ' + k)
         stat = save_2_coco(args.output_folder, k, data_info[k], args.obj_classes,
                            args.fps_divisor, args.res_divisor, not args.only_annotation, ['shoe'])
-        for k in stat:
-            print(f'{k}: {stat[k]}')
+        for s in stat:
+            print(f'{s}: {stat[s]}')
 
 
 if __name__ == '__main__':

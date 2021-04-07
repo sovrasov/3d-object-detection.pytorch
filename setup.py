@@ -1,7 +1,6 @@
 import os.path as osp
-from setuptools import setup, Extension, find_packages
+from setuptools import setup, find_packages
 
-import numpy as np
 
 def readme():
     with open('README.md') as f:

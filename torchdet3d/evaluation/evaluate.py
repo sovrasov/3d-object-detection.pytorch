@@ -3,11 +3,12 @@ import os
 
 import torch
 import numpy as np
-from icecream import ic
 from dataclasses import dataclass
 import albumentations as A
 from tqdm import tqdm
 import cv2
+
+from objectron.dataset import graphics
 
 from .metrics import compute_average_distance, compute_accuracy
 from torchdet3d.utils import load_pretrained_weights, AverageMeter, mkdir_if_missing
@@ -16,7 +17,6 @@ from torchdet3d.dataloaders import Objectron
 module_path = os.path.abspath(os.path.join('/3rdparty/Objectron'))
 if module_path not in sys.path:
     sys.path.append(module_path)
-from objectron.dataset import graphics
 
 @dataclass
 class Evaluator:
@@ -62,16 +62,18 @@ class Evaluator:
 
             #translate keypoints from crop coordinates to original image
             img = img.detach().permute(1, 2, 0).cpu().numpy()
-            pred_kp = ds.unnormalize(img, pred_kp[0].detach().cpu().numpy())
+            #pred_kp = ds.unnormalize(img, pred_kp[0].detach().cpu().numpy())
             pred_kp = A.Compose([
                                    A.Resize(height=prefetch_img.shape[0], width=prefetch_img.shape[1]),
-                                ], keypoint_params=A.KeypointParams(format='xy', remove_invisible=False))(image=img, keypoints=pred_kp)['keypoints']
-            pred_kp = ds.normalize(prefetch_img, pred_kp)
+                                ], keypoint_params=A.KeypointParams(format='xy', remove_invisible=False)) \
+                                (image=img, keypoints=pred_kp)['keypoints']
+            #pred_kp = ds.normalize(prefetch_img, pred_kp)
             expanded_kp = np.zeros((9,3))
             expanded_kp[:,:2] = pred_kp
             graphics.draw_annotation_on_image(prefetch_img, expanded_kp, [9])
             font = cv2.FONT_HERSHEY_SIMPLEX
-            cv2.putText(prefetch_img, str(torch.argmax(pred_cat, dim=1).item()), (10,100), font, 3, (0, 255, 0), 2, cv2.LINE_AA)
+            cv2.putText(prefetch_img, str(torch.argmax(pred_cat, dim=1).item()),
+                        (10,100), font, 3, (0, 255, 0), 2, cv2.LINE_AA)
             cv2.imwrite(f'{self.path_to_save_imgs}/image_{idx}.jpg', prefetch_img)
 
     def val(self, epoch=None):
@@ -84,7 +86,7 @@ class Evaluator:
         self.model.eval()
         loop = tqdm(enumerate(self.val_loader), total=len(self.val_loader), leave=False)
         for it, (imgs, gt_kp, gt_cats) in loop:
-            if any([obj is None for obj in (imgs, gt_kp, gt_cats)]):
+            if any(obj is None for obj in (imgs, gt_kp, gt_cats)):
                 continue
             # put image and keypoints on the appropriate device
             imgs = imgs.to(self.device)
@@ -125,7 +127,7 @@ class Evaluator:
         print('.'*10,'Run evaluating protocol', '.'*10)
         self._init_model()
         self.val()
-        self.evaluate()
+        # self.evaluate()
 
     def _init_model(self):
         if self.checkpoint_path:

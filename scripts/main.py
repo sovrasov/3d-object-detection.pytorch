@@ -1,19 +1,14 @@
 import argparse
 import sys
-import os
 import os.path as osp
 import time
 
-import albumentations as A
 import torch
-import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
-from icecream import ic
 
-import torchdet3d
 from torchdet3d.models import mobilenetv3_large
-from torchdet3d.builders import *
-from torchdet3d.evaluation import Evaluator, compute_average_distance, compute_average_distance
+from torchdet3d.builders import build_loader, build_loss, build_optimizer, build_scheduler
+from torchdet3d.evaluation import Evaluator
 from torchdet3d.trainer import Trainer
 from torchdet3d.utils import read_py_config, Logger
 

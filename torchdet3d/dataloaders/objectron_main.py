@@ -1,6 +1,5 @@
 ''' Parse objectron data to PyTorch dataloader. Cereal box for now only with shuffled images.'''
 from pathlib import Path
-import os
 from torch.utils.data import Dataset, DataLoader
 import torch
 import cv2 as cv
@@ -8,10 +7,8 @@ import json
 import numpy as np
 from icecream import ic
 import albumentations as A
-import sys
 
-from torchdet3d.utils import draw_kp, normalize, unnormalize, ToTensor, ConvertColor
-from objectron.dataset import graphics
+from torchdet3d.utils import draw_kp, normalize, ToTensor, ConvertColor
 
 
 class Objectron(Dataset):
@@ -114,7 +111,8 @@ class Objectron(Dataset):
         clipped_bbox = np.empty_like(bbox)
         clamped_x = list(map(lambda x: self.clamp(x, 3, w-3), bbox[:,0]))
         clamped_y = list(map(lambda y: self.clamp(y, 3, h-3), bbox[:,1]))
-        clipped_bbox[:,0] = clamped_x;  clipped_bbox[:,1] = clamped_y
+        clipped_bbox[:,0] = clamped_x
+        clipped_bbox[:,1] = clamped_y
         return clipped_bbox
 
     @staticmethod
