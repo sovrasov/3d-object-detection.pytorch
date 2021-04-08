@@ -112,7 +112,7 @@ class Evaluator:
             if self.debug and it == self.debug_steps:
                 break
 
-        ep_mess = f"epoch : {epoch}\n" if epoch is not None else f""
+        ep_mess = f"epoch : {epoch}\n" if epoch is not None else ""
         print("\nComputed val metrics:\n"
               f"{ep_mess}"
               f"ADD ---> {ADD_meter.avg}\n"

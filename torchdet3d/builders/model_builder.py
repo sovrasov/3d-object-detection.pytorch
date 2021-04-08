@@ -11,7 +11,7 @@ from efficientnet_lite1_pytorch_model import EfficientnetLite1ModelFile
 from efficientnet_lite2_pytorch_model import EfficientnetLite2ModelFile
 
 from torchdet3d.models import MobileNetV3, init_pretrained_weights, model_params
-from  torchdet3d.utils import load_pretrained_weights
+from torchdet3d.utils import load_pretrained_weights
 
 __AVAI_MODELS__ = {
                     'mobilenetv3_large', 'mobilenetv3_small', 'efficientnet-lite0', 'efficientnet-lite1',

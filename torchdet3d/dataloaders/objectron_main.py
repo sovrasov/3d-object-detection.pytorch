@@ -9,7 +9,7 @@ import numpy as np
 from icecream import ic
 import albumentations as A
 
-from torchdet3d.utils import (draw_kp, normalize, ToTensor, ConvertColor)
+from torchdet3d.utils import draw_kp, ToTensor, ConvertColor, unnormalize_img
 
 
 class Objectron(Dataset):

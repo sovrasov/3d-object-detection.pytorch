@@ -20,7 +20,6 @@ class Detector:
 
     def get_detections(self, frame):
         """Returns all detections on frame"""
-        _, _, h, w = self.net.get_input_shape()
         out = self.net.forward(frame)
         detections = self.__decode_detections(out, frame.shape)
         return detections

@@ -6,7 +6,8 @@ import time
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
-from torchdet3d.builders import *
+from torchdet3d.builders import (build_loader, build_model, build_loss,
+                                    build_optimizer, build_scheduler)
 from torchdet3d.evaluation import Evaluator
 from torchdet3d.trainer import Trainer
 from torchdet3d.utils import read_py_config, Logger, set_random_seed
