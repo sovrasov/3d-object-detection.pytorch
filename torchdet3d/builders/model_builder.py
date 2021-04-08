@@ -11,7 +11,7 @@ from efficientnet_lite1_pytorch_model import EfficientnetLite1ModelFile
 from efficientnet_lite2_pytorch_model import EfficientnetLite2ModelFile
 
 from torchdet3d.models import MobileNetV3, init_pretrained_weights, model_params
-from torchdet3d.utils import load_pretrained_weights
+import torchdet3d.utils as uti
 
 __AVAI_MODELS__ = {
                     'mobilenetv3_large', 'mobilenetv3_small', 'efficientnet-lite0', 'efficientnet-lite1',
@@ -37,7 +37,7 @@ def build_model(config, export_mode=False):
                              global_params=global_params)
 
         if config.model.pretrained and not export_mode:
-            load_pretrained_weights(model, weights_path)
+            uti.load_pretrained_weights(model, weights_path)
 
     elif config.model.name == 'mobilenetv3_large':
         params = model_params['mobilenetv3_large']

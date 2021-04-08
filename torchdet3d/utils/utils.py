@@ -212,7 +212,6 @@ def draw_kp(img, keypoints, name=None, normalized=True, RGB=True, num_keypoints=
     name: path to save
     '''
     img_copy = img.copy()
-    print(img_copy.shape)
     # if image transposed
     if img_copy.shape[0] == 3:
         img_copy = np.transpose(img_copy, (1,2,0))
