@@ -36,21 +36,21 @@ def build_model(cfg, export_mode=False):
                              blocks_args=blocks_args,
                              global_params=global_params)
 
-        if cfg.model.pretrained:
+        if cfg.model.pretrained and not export_mode:
             load_pretrained_weights(model, weights_path)
 
     elif cfg.model.name == 'mobilenetv3_large':
             params = model_params['mobilenetv3_large']
             model = model_wraper(model_class=MobileNetV3, output_channels=1280,
                                     num_classes=cfg.model.num_classes, export_mode=export_mode, **params)
-            if cfg.model.pretrained:
+            if cfg.model.pretrained and not export_mode:
                 init_pretrained_weights(model, key='mobilenetv3_large')
 
     elif cfg.model.name == 'mobilenetv3_small':
             params = model_params['mobilenetv3_small']
             model = model_wraper(model_class=MobileNetV3, output_channels=1024,
                                     num_classes=cfg.model.num_classes, export_mode=export_mode, **params)
-            if cfg.model.pretrained:
+            if cfg.model.pretrained and not export_mode:
                 init_pretrained_weights(model, key='mobilenetv3_small')
 
     return model
@@ -99,11 +99,15 @@ def model_wraper(model_class, output_channels, num_points=18,
             if num_classes > 1:
                 targets = self.classifier(pooled_features)
             else:
-                targets = torch.zeros((x.size(0)), dtype=torch.long)
+                targets = torch.zeros((x.size(0)), dtype=torch.float32)
 
-            kp = torch.cat([self.regressors[id](sample) for id, sample in zip(targets, pooled_features)], 0)
+            predicted_output = list()
+            if len(self.regressors) > 1:
+                for id, reg in enumerate(self.regressors[1:]):
+                    predicted_output.append(reg(pooled_features).view(1, x.size(0), num_points // 2, 2))
+            predicted_output = self.sigmoid(torch.cat(predicted_output))
 
-            return kp.view(x.size(0), num_points // 2, 2)
+            return predicted_output
 
         def forward(self, x, cats):
             ''' ordinary forward for training '''

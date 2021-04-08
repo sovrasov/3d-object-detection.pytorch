@@ -6,7 +6,6 @@ import time
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
-from torchdet3d.models import mobilenetv3_large
 from torchdet3d.builders import build_loader, build_loss, build_optimizer, build_scheduler
 from torchdet3d.evaluation import Evaluator
 from torchdet3d.trainer import Trainer
