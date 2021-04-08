@@ -24,34 +24,34 @@ EFFICIENT_NET_WEIGHTS = {
                          'efficientnet-lite2' : EfficientnetLite2ModelFile.get_model_file_path()
                          }
 
-def build_model(cfg, export_mode=False):
-    assert cfg.model.name in __AVAI_MODELS__, f"Wrong model name parameter. Expected one of {__AVAI_MODELS__}"
+def build_model(config, export_mode=False):
+    assert config.model.name in __AVAI_MODELS__, f"Wrong model name parameter. Expected one of {__AVAI_MODELS__}"
 
-    if cfg.model.name.startswith('efficientnet'):
-        weights_path = EFFICIENT_NET_WEIGHTS[cfg.model.name]
-        blocks_args, global_params = get_model_params(cfg.model.name, override_params=None)
+    if config.model.name.startswith('efficientnet'):
+        weights_path = EFFICIENT_NET_WEIGHTS[config.model.name]
+        blocks_args, global_params = get_model_params(config.model.name, override_params=None)
         model = model_wraper(model_class=EfficientNet,
                              output_channels=1280,
-                             num_classes=cfg.model.num_classes,
+                             num_classes=config.model.num_classes,
                              blocks_args=blocks_args,
                              global_params=global_params)
 
-        if cfg.model.pretrained and not export_mode:
+        if config.model.pretrained and not export_mode:
             load_pretrained_weights(model, weights_path)
 
-    elif cfg.model.name == 'mobilenetv3_large':
-            params = model_params['mobilenetv3_large']
-            model = model_wraper(model_class=MobileNetV3, output_channels=1280,
-                                    num_classes=cfg.model.num_classes, export_mode=export_mode, **params)
-            if cfg.model.pretrained and not export_mode:
-                init_pretrained_weights(model, key='mobilenetv3_large')
+    elif config.model.name == 'mobilenetv3_large':
+        params = model_params['mobilenetv3_large']
+        model = model_wraper(model_class=MobileNetV3, output_channels=1280,
+                                num_classes=config.model.num_classes, export_mode=export_mode, **params)
+        if config.model.pretrained and not export_mode:
+            init_pretrained_weights(model, key='mobilenetv3_large')
 
-    elif cfg.model.name == 'mobilenetv3_small':
-            params = model_params['mobilenetv3_small']
-            model = model_wraper(model_class=MobileNetV3, output_channels=1024,
-                                    num_classes=cfg.model.num_classes, export_mode=export_mode, **params)
-            if cfg.model.pretrained and not export_mode:
-                init_pretrained_weights(model, key='mobilenetv3_small')
+    elif config.model.name == 'mobilenetv3_small':
+        params = model_params['mobilenetv3_small']
+        model = model_wraper(model_class=MobileNetV3, output_channels=1024,
+                                num_classes=config.model.num_classes, export_mode=export_mode, **params)
+        if config.model.pretrained and not export_mode:
+            init_pretrained_weights(model, key='mobilenetv3_small')
 
     return model
 
@@ -61,7 +61,7 @@ def model_wraper(model_class, output_channels, num_points=18,
         def __init__(self, output_channel=output_channels, **kwargs):
             super().__init__(**kwargs)
             self.regressors = nn.ModuleList()
-            for trg_id, trg_num_classes in enumerate(range(num_classes)):
+            for _ in range(num_classes):
                 self.regressors.append(self._init_regressors(output_channel))
             self.classifier = nn.Sequential(
                 nn.Dropout(0.5),
@@ -96,14 +96,9 @@ def model_wraper(model_class, output_channels, num_points=18,
                 choose according head for this '''
             features = self.extract_features(x)
             pooled_features = self._glob_feature_vector(features, mode=pooling_mode)
-            if num_classes > 1:
-                targets = self.classifier(pooled_features)
-            else:
-                targets = torch.zeros((x.size(0)), dtype=torch.float32)
-
             predicted_output = list()
             if len(self.regressors) > 1:
-                for id, reg in enumerate(self.regressors[1:]):
+                for reg in self.regressors[1:]:
                     predicted_output.append(reg(pooled_features).view(1, x.size(0), num_points // 2, 2))
             predicted_output = self.sigmoid(torch.cat(predicted_output))
 
@@ -113,7 +108,7 @@ def model_wraper(model_class, output_channels, num_points=18,
             ''' ordinary forward for training '''
             features = self.extract_features(x)
             pooled_features = self._glob_feature_vector(features, mode=pooling_mode)
-            kp = torch.cat([self.regressors[id](sample) for id, sample in zip(cats, pooled_features)], 0)
+            kp = torch.cat([self.regressors[id_](sample) for id_, sample in zip(cats, pooled_features)], 0)
             kp = self.sigmoid(kp)
             if num_classes > 1:
                 targets = self.classifier(pooled_features)
@@ -127,8 +122,8 @@ def model_wraper(model_class, output_channels, num_points=18,
         model.forward = model.forward_to_onnx
     return model
 
-def test(cfg):
-    model = build_model(cfg)
+def test(config):
+    model = build_model(config)
     img = torch.rand(128,3,224,224)
     cats = torch.randint(0,5,(128,))
     out = model(img, cats)

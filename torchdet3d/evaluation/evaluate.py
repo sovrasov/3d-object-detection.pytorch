@@ -4,16 +4,11 @@ import os
 import torch
 import numpy as np
 from dataclasses import dataclass
-import albumentations as A
 from tqdm import tqdm
 from copy import deepcopy
-import cv2
-
-from objectron.dataset import graphics
 
 from .metrics import compute_average_distance, compute_accuracy
-from torchdet3d.utils import (load_pretrained_weights, AverageMeter,
-                                mkdir_if_missing, unnormalize, draw_kp, unnormalize_img)
+from torchdet3d.utils import (AverageMeter, mkdir_if_missing, draw_kp)
 from torchdet3d.builders import build_augmentations
 from torchdet3d.dataloaders import Objectron
 
@@ -55,7 +50,11 @@ class Evaluator:
             prefetch_img, img, gt_kp, gt_cat, crop_cords= ds[idx]
             # draw true key points on original image
             gt_kp_cp = self.transform_kp(deepcopy(gt_kp), crop_cords)
-            draw_kp(prefetch_img, gt_kp_cp, f'{self.path_to_save_imgs}/tested_image_№_{idx}_true.jpg', RGB=False, normalized=False)
+            draw_kp(prefetch_img,
+                    gt_kp_cp,
+                    f'{self.path_to_save_imgs}/tested_image_№_{idx}_true.jpg',
+                    RGB=False,
+                    normalized=False)
             img, gt_kp = self.put_on_device([img, gt_kp], self.device)
             # feed forward net
             pred_kp, pred_cat = self.model(torch.unsqueeze(img,0), torch.tensor(gt_cat).view(1,-1))
@@ -71,7 +70,12 @@ class Evaluator:
             # draw key_points on original image
             pred_kp = self.transform_kp(pred_kp[0].detach().cpu().numpy(), crop_cords)
             label = OBJECTRON_CLASSES[torch.argmax(pred_cat, dim=1).item()]
-            draw_kp(prefetch_img, pred_kp, f'{self.path_to_save_imgs}/tested_image_№_{idx}_predicted.jpg', RGB=False, normalized=False, label=label)
+            draw_kp(prefetch_img,
+                    pred_kp,
+                    f'{self.path_to_save_imgs}/tested_image_№_{idx}_predicted.jpg',
+                    RGB=False,
+                    normalized=False,
+                    label=label)
 
     def val(self, epoch=None):
         ''' procedure launching main validation'''
@@ -109,7 +113,7 @@ class Evaluator:
                 break
 
         ep_mess = f"epoch : {epoch}\n" if epoch is not None else f""
-        print(f"\nComputed val metrics:\n"
+        print("\nComputed val metrics:\n"
               f"{ep_mess}"
               f"ADD ---> {ADD_meter.avg}\n"
               f"SADD ---> {SADD_meter.avg}\n"
@@ -123,8 +127,8 @@ class Evaluator:
 
     @staticmethod
     def put_on_device(items, device):
-        for i in range(len(items)):
-            items[i] = items[i].to(device)
+        for i, item in enumerate(items):
+            items[i] = item.to(device)
         return items
 
     @staticmethod

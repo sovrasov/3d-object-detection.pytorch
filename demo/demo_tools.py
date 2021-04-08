@@ -24,16 +24,16 @@ class IEModel:
         return np.copy(res[self.output_key])
 
     def forward_async(self, img):
-        id = len(self.reqs_ids)
-        self.net.start_async(request_id=id,
+        id_ = len(self.reqs_ids)
+        self.net.start_async(request_id=id_,
                              inputs={self.input_key: self._preprocess(img)})
-        self.reqs_ids.append(id)
+        self.reqs_ids.append(id_)
 
     def grab_all_async(self):
         outputs = []
-        for id in self.reqs_ids:
-            self.net.requests[id].wait(-1)
-            res = self.net.requests[id].output_blobs[self.output_key].buffer
+        for id_ in self.reqs_ids:
+            self.net.requests[id_].wait(-1)
+            res = self.net.requests[id_].output_blobs[self.output_key].buffer
             outputs.append(np.copy(res))
         self.reqs_ids = []
         return outputs

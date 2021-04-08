@@ -3,7 +3,6 @@ import argparse
 
 import torch
 import os
-import onnx
 
 from torchdet3d.builders import build_model
 from torchdet3d.utils import load_pretrained_weights, read_py_config

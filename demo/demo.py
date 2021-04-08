@@ -1,8 +1,4 @@
 import argparse
-import inspect
-import os.path as osp
-import os
-import sys
 
 import cv2 as cv
 import glog as log
@@ -16,7 +12,7 @@ from torchdet3d.utils import draw_kp
 OBJECTRON_CLASSES = ('bike', 'book', 'bottle', 'cereal_box', 'camera', 'chair', 'cup', 'laptop', 'shoe')
 
 class Detector:
-    """Wrapper class for face detector"""
+    """Wrapper class for object detector"""
     def __init__(self, ie,  model_path, conf=.6, device='CPU', ext_path=''):
         self.net = load_ie_model(ie, model_path, device, None, ext_path)
         self.confidence = conf
@@ -25,7 +21,7 @@ class Detector:
     def get_detections(self, frame):
         """Returns all detections on frame"""
         _, _, h, w = self.net.get_input_shape()
-        out = self.net.forward(cv.resize(frame, (w, h)))
+        out = self.net.forward(frame)
         detections = self.__decode_detections(out, frame.shape)
         return detections
 
@@ -65,11 +61,10 @@ class Regressor:
 
     def get_detections(self, frame, detections):
         """Returns all detections on frame"""
-        _, _, h, w = self.net.get_input_shape()
         outputs = []
-        for i, rect in enumerate(detections):
+        for rect in detections:
             cropped_img = self.crop(frame, rect[0])
-            out = self.net.forward(cv.resize(cropped_img, (w, h)))
+            out = self.net.forward(cropped_img)
             out = self.__decode_detections(out, rect)
             outputs.append(out)
         return outputs
@@ -98,40 +93,41 @@ class Regressor:
         crop = frame[y0:y1, x0:x1]
         return crop
 
-def draw_detections(frame, detections):
+def draw_detections(frame, reg_detections, det_detections, reg_only=True):
     """Draws detections and labels"""
-    for i, out in enumerate(detections):
-        kp = out[0]
-        left = np.argmin(kp[:,0])
-        top = kp[left, 1]
-        label = out[1]
+    for det_out, reg_out in zip(det_detections, reg_detections):
+        left, top, right, bottom = det_out[0]
+        kp = reg_out[0]
+        label = reg_out[1]
         label = OBJECTRON_CLASSES[label]
-        frame = draw_kp(frame, kp, None, RGB=False, normalized=False)
+        if not reg_only:
+            cv.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), thickness=2)
 
-        label_size, _ = cv.getTextSize(label, cv.FONT_HERSHEY_SIMPLEX, 1, 1)
+        frame = draw_kp(frame, kp, None, RGB=False, normalized=False)
+        label_size, base_line = cv.getTextSize(label, cv.FONT_HERSHEY_SIMPLEX, 1, 1)
         top = max(top, label_size[1])
-        # cv.rectangle(frame, (left, top - label_size[1]), (left + label_size[0], top + base_line),
-        #              (255, 255, 255), cv.FILLED)
+        cv.rectangle(frame, (left, top - label_size[1]), (left + label_size[0], top + base_line),
+                     (255, 255, 255), cv.FILLED)
         cv.putText(frame, label, (left, top), cv.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0))
 
     return frame
 
-def run(params, capture, detector, regressor, write_video=False):
+def run(params, capture, detector, regressor, write_video=False, resolution = (1280, 720)):
     """Starts the 3D object detection demo"""
     fourcc = cv.VideoWriter_fourcc(*'MP4V')
-    resolution = (1280, 720)
     fps = 24
     if write_video:
         writer_video = cv.VideoWriter('output_video_demo.mp4', fourcc, fps, resolution)
     win_name = '3D-object-detection'
     while cv.waitKey(1) != 27:
         has_frame, frame = capture.read()
+        frame = cv.resize(frame, resolution)
         if not has_frame:
             return
         detections = detector.get_detections(frame)
         outputs = regressor.get_detections(frame, detections)
 
-        frame = draw_detections(frame, outputs)
+        frame = draw_detections(frame, outputs, detections, reg_only=False)
         cv.imshow(win_name, frame)
         if write_video:
             writer_video.write(cv.resize(frame, resolution))
@@ -145,6 +141,7 @@ def main():
     parser = argparse.ArgumentParser(description='3d object detection live demo script')
     parser.add_argument('--video', type=str, default=None, help='Input video')
     parser.add_argument('--cam_id', type=int, default=-1, help='Input cam')
+    parser.add_argument('--resolution', type=int, nargs='+', help='capture resolution')
     parser.add_argument('--config', type=str, default=None, required=False,
                         help='Configuration file')
     parser.add_argument('--od_model', type=str, required=True)
@@ -161,8 +158,8 @@ def main():
     if args.cam_id >= 0:
         log.info('Reading from cam {}'.format(args.cam_id))
         cap = cv.VideoCapture(args.cam_id)
-        cap.set(cv.CAP_PROP_FRAME_WIDTH, 1280)
-        cap.set(cv.CAP_PROP_FRAME_HEIGHT, 720)
+        cap.set(cv.CAP_PROP_FRAME_WIDTH, args.resolution[0])
+        cap.set(cv.CAP_PROP_FRAME_HEIGHT, args.resolution[1])
         cap.set(cv.CAP_PROP_FOURCC, cv.VideoWriter_fourcc(*'MJPG'))
     else:
         assert args.video, "No video input was given"
@@ -174,7 +171,7 @@ def main():
     object_detector = Detector(ie, args.od_model, args.det_tresh, args.device, args.cpu_extension)
     regressor = Regressor(ie, args.reg_model, args.device, args.cpu_extension)
     # running demo
-    run(args, cap, object_detector, regressor, args.write_video)
+    run(args, cap, object_detector, regressor, args.write_video, tuple(args.resolution))
 
 if __name__ == '__main__':
     main()

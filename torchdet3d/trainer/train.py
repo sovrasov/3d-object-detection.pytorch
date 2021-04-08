@@ -1,5 +1,6 @@
 from tqdm import tqdm
 from dataclasses import dataclass
+import torch
 
 from torchdet3d.evaluation import compute_average_distance, compute_accuracy
 from torchdet3d.utils import AverageMeter, save_snap
@@ -62,9 +63,14 @@ class Trainer:
             self.train_step += 1
             # update progress bar
             loop.set_description(f'Epoch [{epoch}/{self.max_epoch}]')
-            loop.set_postfix(loss=loss.item(), avr_loss = losses.avg,
-                             ADD=ADD, avr_ADD=ADD_meter.avg, SADD=SADD,
-                             avr_SADD=SADD_meter.avg, acc=acc,  acc_avg = ACC_meter.avg, lr=self.optimizer.param_groups[0]['lr'])
+            loop.set_postfix(loss=loss.item(),
+                             avr_loss = losses.avg,
+                             ADD=ADD, avr_ADD=ADD_meter.avg,
+                             SADD=SADD,
+                             avr_SADD=SADD_meter.avg,
+                             acc=acc,
+                             acc_avg = ACC_meter.avg,
+                             lr=self.optimizer.param_groups[0]['lr'])
             if ((it % self.print_freq == 0) or (it == self.num_iters-1)):
                 print(
                         'epoch: [{0}/{1}][{2}/{3}]\t'
@@ -110,6 +116,6 @@ class Trainer:
 
     @staticmethod
     def put_on_device(items, device):
-        for i in range(len(items)):
-            items[i] = items[i].to(device)
+        for i, item in enumerate(items):
+            items[i] = item.to(device)
         return items

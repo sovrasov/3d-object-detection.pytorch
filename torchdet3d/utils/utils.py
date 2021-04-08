@@ -1,20 +1,17 @@
 import pickle
 import sys
 import os
-import errno
-
-from collections import OrderedDict
 import os.path as osp
+import errno
+import random
+import warnings
+from collections import OrderedDict
 from functools import partial
 from importlib import import_module
-import random
-import os
-import warnings
 
 import numpy as np
 import cv2 as cv
 import torch
-import torch.nn as nn
 
 from attrdict import AttrDict as adict
 
@@ -184,8 +181,7 @@ def unnormalize_img(img,
         mean = torch.tensor(mean, device=img.device) * 255
         std = torch.tensor(std, device=img.device) * 255
         return img.permute(1, 2, 0)*std + mean
-    else:
-        return img*std + mean
+    return img*std + mean
 
 def unnormalize(image_shape, normalized_keypoints):
     ''' transform image to global pixel values '''

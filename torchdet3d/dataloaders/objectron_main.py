@@ -9,9 +9,7 @@ import numpy as np
 from icecream import ic
 import albumentations as A
 
-from torchdet3d.utils import (draw_kp, normalize, unnormalize,
-                                unnormalize_img, ToTensor, ConvertColor)
-from objectron.dataset import graphics
+from torchdet3d.utils import (draw_kp, normalize, ToTensor, ConvertColor)
 
 
 class Objectron(Dataset):
@@ -34,11 +32,12 @@ class Objectron(Dataset):
             raise RuntimeError("Unknown dataset mode")
 
         # filter categories
-        if not category_list == 'all':
+        if category_list != 'all':
             self.annotations = list(filter(lambda x: x['category_id'] in category_list, self.ann['annotations']))
             images_id = {ann_obj['image_id'] for ann_obj in self.annotations}
             # create dict since ordering now different
-            self.images = {img_obj['id']: img_obj for img_obj in filter(lambda x: x['id'] in images_id, self.ann['images'])}
+            self.images = {img_obj['id']: img_obj
+                            for img_obj in filter(lambda x: x['id'] in images_id, self.ann['images'])}
             assert len(self.images) == len(images_id)
         else:
             self.annotations = self.ann['annotations']
@@ -161,7 +160,7 @@ def test():
         assert bbox.shape == (batch_size, 9, 2)
 
     root = './data_cereal_box'
-    normalize = A.augmentations.transforms.Normalize(**dict(mean=[0.5931, 0.4690, 0.4229],
+    normalization = A.augmentations.transforms.Normalize(**dict(mean=[0.5931, 0.4690, 0.4229],
                                                             std=[0.2471, 0.2214, 0.2157]))
     transform = A.Compose([ ConvertColor(),
                             A.Resize(290, 290),
@@ -169,7 +168,7 @@ def test():
                             A.HorizontalFlip(p=0.5),
                             A.augmentations.transforms.ISONoise(color_shift=(0.15,0.35),
                                                                 intensity=(0.2, 0.5), p=0.2),
-                            normalize,
+                            normalization,
                             ToTensor((290, 290)),
                           ],keypoint_params=A.KeypointParams(format='xy'))
     for index in np.random.randint(0,60000,1):
