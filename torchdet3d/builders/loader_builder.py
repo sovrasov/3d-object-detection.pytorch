@@ -3,7 +3,7 @@ import albumentations as A
 import cv2
 
 from torchdet3d.dataloaders import Objectron
-import torchdet3d.utils as uti
+from torchdet3d.utils import ConvertColor, ToTensor
 
 def build_loader(config, mode='train'):
 
@@ -30,20 +30,20 @@ def build_augmentations(cfg):
     normalize = A.augmentations.transforms.Normalize (**cfg.data.normalization)
 
     train_transform = A.Compose([
-                            uti.ConvertColor(),
+                            ConvertColor(),
                             A.Resize(*cfg.data.resize, interpolation=cv2.INTER_CUBIC),
                             A.HorizontalFlip(p=0.3),
                             # A.Rotate(limit=30, p=0.3, interpolation=cv2.INTER_CUBIC),
                             A.RandomBrightnessContrast(p=0.2),
                             normalize,
-                            uti.ToTensor(cfg.data.resize)
+                            ToTensor(cfg.data.resize)
                             ], keypoint_params=A.KeypointParams(format='xy', remove_invisible=False))
 
     test_transform = A.Compose([
-                            uti.ConvertColor(),
+                            ConvertColor(),
                             A.Resize(*cfg.data.resize,cv2.INTER_CUBIC),
                             normalize,
-                            uti.ToTensor(cfg.data.resize)
+                            ToTensor(cfg.data.resize)
                             ], keypoint_params=A.KeypointParams(format='xy', remove_invisible=False))
 
     return train_transform, test_transform

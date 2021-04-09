@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from albumentations.core.transforms_interface import BasicTransform, ImageOnlyTransform
 
-from torchdet3d.utils import normalize
+from utils import normalize
 
 class ConvertColor(ImageOnlyTransform):
     """Converting color of the image
