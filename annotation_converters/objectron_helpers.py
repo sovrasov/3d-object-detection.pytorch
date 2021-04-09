@@ -1,4 +1,3 @@
-from objectron.schema import annotation_data_pb2 as annotation_protocol
 import os
 import sys
 import subprocess
@@ -10,6 +9,9 @@ module_path = os.path.abspath(os.path.join(
     os.path.dirname(__file__), '../3rdparty/Objectron'))
 if module_path not in sys.path:
     sys.path.append(module_path)
+
+#pylint: disable = wrong-import-position
+from objectron.schema import annotation_data_pb2 as annotation_protocol
 
 # The annotations are stored in protocol buffer format.
 # The AR Metadata captured with each frame in the video
