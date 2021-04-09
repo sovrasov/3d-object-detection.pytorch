@@ -10,6 +10,9 @@ if __name__ == '__main__':
         '3rdparty/',
         'setup.py',
         'configs/detection',
+        'torchdet3d/models',
+        'build',
+        'deprecated'
         '.history/',
         'torchdet3d/models'
     ]

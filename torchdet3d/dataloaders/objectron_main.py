@@ -1,5 +1,6 @@
 ''' Parse objectron data to PyTorch dataloader. Cereal box for now only with shuffled images.'''
 from pathlib import Path
+
 from torch.utils.data import Dataset, DataLoader
 import torch
 import cv2 as cv
@@ -8,15 +9,17 @@ import numpy as np
 from icecream import ic
 import albumentations as A
 
-from torchdet3d.utils import draw_kp, normalize, ToTensor, ConvertColor
+from torchdet3d.utils import draw_kp, ToTensor, ConvertColor, unnormalize_img
 
 
 class Objectron(Dataset):
-    def __init__(self, root_folder, mode='train', transform=None, debug_mode=False):
+    def __init__(self, root_folder, mode='train', transform=None, debug_mode=False, name='0', category_list='all'):
         self.root_folder = root_folder
+        self.name=name
         self.transform = transform
         self.debug_mode = debug_mode
         self.mode = mode
+
         if mode == 'train':
             ann_path = Path(root_folder).resolve() / 'annotations/objectron_train.json'
             with open(ann_path, 'r') as f:
@@ -28,16 +31,28 @@ class Objectron(Dataset):
         else:
             raise RuntimeError("Unknown dataset mode")
 
+        # filter categories
+        if category_list != 'all':
+            self.annotations = list(filter(lambda x: x['category_id'] in category_list, self.ann['annotations']))
+            images_id = {ann_obj['image_id'] for ann_obj in self.annotations}
+            # create dict since ordering now different
+            self.images = {img_obj['id']: img_obj
+                            for img_obj in filter(lambda x: x['id'] in images_id, self.ann['images'])}
+            assert len(self.images) == len(images_id)
+        else:
+            self.annotations = self.ann['annotations']
+            self.images = self.ann['images']
+
     def __len__(self):
-        return len(self.ann['annotations'])
+        return len(self.annotations)
 
     def __getitem__(self, indx):
         # get path to image from annotations
-        raw_keypoints = self.ann['annotations'][indx]['keypoints']
-        img_id = self.ann['annotations'][indx]['image_id']
-        category = int(self.ann['annotations'][indx]['category_id']) - 1
+        raw_keypoints = self.annotations[indx]['keypoints']
+        img_id = self.annotations[indx]['image_id']
+        category = int(self.annotations[indx]['category_id']) - 1
         # get raw key points for bb from annotations
-        img_path = self.root_folder + '/' + (self.ann['images'][img_id]['file_name'])
+        img_path = self.root_folder + '/' + (self.images[img_id]['file_name'])
         # read image
         image = cv.imread(img_path)
         assert image is not None
@@ -45,11 +60,12 @@ class Objectron(Dataset):
         # transform raw key points to this representation
         unnormalized_keypoints = np.array(raw_keypoints).reshape(9, 2)
         # "print" image after crop with keypoints if needed
+
         if self.debug_mode:
-            draw_kp(image, unnormalized_keypoints, 'image_before_pipeline.jpg',
+            draw_kp(image, unnormalized_keypoints, f'image_before_pipeline_{self.name}.jpg',
                     normalized=False, RGB=False)
         # given unnormalized keypoints crop object on image
-        cropped_keypoints, cropped_img = self.crop(image, unnormalized_keypoints)
+        cropped_keypoints, cropped_img, crop_cords = self.crop(image, unnormalized_keypoints)
 
         # do augmentations with keypoints
         if self.transform:
@@ -60,18 +76,18 @@ class Objectron(Dataset):
                     isinstance(transformed_image, torch.Tensor) and
                     isinstance(transformed_keypoints, torch.Tensor))
         else:
-            transformed_image, transformed_keypoints = image, cropped_keypoints
-        # given croped image and unnormalized key points: normilize it for cropped image
-        transformed_keypoints = normalize(transformed_image.permute(1,2,0), transformed_keypoints)
+            transformed_image, transformed_keypoints = cropped_img, cropped_keypoints
         # "print" image after crop with keypoints if needed
         if self.debug_mode:
-            draw_kp(transformed_image.numpy(), transformed_keypoints.numpy(), 'image_after_pipeline.jpg')
+            draw_kp(unnormalize_img(transformed_image).numpy(), transformed_keypoints.numpy(),
+                                    f'image_after_pipeline_{self.name}.jpg')
 
         if self.mode == 'test':
             return (image,
-                    torch.from_numpy(transformed_image),
+                    transformed_image,
                     transformed_keypoints,
-                    category)
+                    category,
+                    crop_cords)
 
         return transformed_image, transformed_keypoints, category
 
@@ -89,9 +105,10 @@ class Objectron(Dataset):
         x1 = self.clamp(max(clipped_bb[:,0]) + 10, 0, real_w)
         y1 = self.clamp(max(clipped_bb[:,1]) + 10, 0, real_h)
 
+        crop_cords = (x0,y0,x1,y1)
         # prepare transformation for image cropping and kp shifting
         transform_crop = A.Compose([
-                        A.Crop(x0,y0,x1,y1),
+                        A.Crop(*crop_cords),
                         ], keypoint_params=A.KeypointParams(format='xy'))
         # do actual crop and kp shift
         transformed = transform_crop(
@@ -103,7 +120,7 @@ class Objectron(Dataset):
         bb = transformed['keypoints']
         assert len(bb) == 9
 
-        return bb, crop_img
+        return bb, crop_img, crop_cords
 
     def clip_bb(self, bbox, w, h):
         ''' clip offset bbox coordinates
@@ -123,7 +140,10 @@ class Objectron(Dataset):
 def test():
     "Perform dataloader test"
     def super_vision_test(root, mode='val', transform=None, index=7):
-        ds = Objectron(root, mode=mode, transform=transform, debug_mode=True)
+        ds = Objectron(root, mode=mode, transform=transform, debug_mode=True, name=str(index))
+        print(len(ds))
+        ds = Objectron(root, mode=mode, transform=transform, debug_mode=True, name=str(index), category_list=[1])
+        print(len(ds))
         _, bbox, _ = ds[index]
         assert bbox.shape == (9,2)
 
@@ -139,14 +159,20 @@ def test():
         assert img_tensor.shape == (batch_size, 3, 290, 290)
         assert bbox.shape == (batch_size, 9, 2)
 
-    root = 'data'
+    root = './data_cereal_box'
+    normalization = A.augmentations.transforms.Normalize(**dict(mean=[0.5931, 0.4690, 0.4229],
+                                                            std=[0.2471, 0.2214, 0.2157]))
     transform = A.Compose([ ConvertColor(),
                             A.Resize(290, 290),
                             A.RandomBrightnessContrast(p=0.2),
-                            ToTensor()
+                            A.HorizontalFlip(p=0.5),
+                            A.augmentations.transforms.ISONoise(color_shift=(0.15,0.35),
+                                                                intensity=(0.2, 0.5), p=0.2),
+                            normalization,
+                            ToTensor((290, 290)),
                           ],keypoint_params=A.KeypointParams(format='xy'))
-
-    super_vision_test(root, mode='train', transform=transform, index=200435)
+    for index in np.random.randint(0,60000,1):
+        super_vision_test(root, mode='train', transform=transform, index=index)
     dataset_test(root, mode='val', transform=transform, batch_size=256)
     dataset_test(root, mode='train', transform=transform, batch_size=256)
 

@@ -3,7 +3,10 @@ import math
 import torch
 import torch.nn as nn
 
-__all__ = ['mobilenetv3_large', 'mobilenetv3_small']
+from  torchdet3d.utils import load_pretrained_weights
+
+
+__all__ = ['MobileNetV3', 'init_pretrained_weights', 'model_params']
 
 pretrained_urls = {
     'mobilenetv3_small':
@@ -11,6 +14,40 @@ pretrained_urls = {
     'mobilenetv3_large':
     'https://github.com/d-li14/mobilenetv3.pytorch/blob/master/pretrained/mobilenetv3-large-1cd25616.pth?raw=true',
 }
+
+model_params = dict(
+    mobilenetv3_large=dict(cfgs = [
+        # k, t, c, SE, HS, s
+        [3,   1,  16, 0, 0, 1],
+        [3,   4,  24, 0, 0, 2],
+        [3,   3,  24, 0, 0, 1],
+        [5,   3,  40, 1, 0, 2],
+        [5,   3,  40, 1, 0, 1],
+        [5,   3,  40, 1, 0, 1],
+        [3,   6,  80, 0, 1, 2],
+        [3, 2.5,  80, 0, 1, 1],
+        [3, 2.3,  80, 0, 1, 1],
+        [3, 2.3,  80, 0, 1, 1],
+        [3,   6, 112, 1, 1, 1],
+        [3,   6, 112, 1, 1, 1],
+        [5,   6, 160, 1, 1, 2],
+        [5,   6, 160, 1, 1, 1],
+        [5,   6, 160, 1, 1, 1]
+    ], mode='large'),
+    mobilenetv3_small=dict(cfgs = [
+        # k, t, c, SE, HS, s
+        [3,    1,  16, 1, 0, 2],
+        [3,  4.5,  24, 0, 0, 2],
+        [3, 3.67,  24, 0, 0, 1],
+        [5,    4,  40, 1, 1, 2],
+        [5,    6,  40, 1, 1, 1],
+        [5,    6,  40, 1, 1, 1],
+        [5,    3,  48, 1, 1, 1],
+        [5,    3,  48, 1, 1, 1],
+        [5,    6,  96, 1, 1, 2],
+        [5,    6,  96, 1, 1, 1],
+        [5,    6,  96, 1, 1, 1],
+    ], mode='small' ))
 
 def _make_divisible(v, divisor, min_value=None):
     """
@@ -128,7 +165,7 @@ class InvertedResidual(nn.Module):
 
 
 class MobileNetV3(nn.Module):
-    def __init__(self, cfgs, mode, num_points=18, num_classes=4, width_mult=1.):
+    def __init__(self, cfgs, mode, num_points=18, num_classes=9, width_mult=1.):
         super().__init__()
         # setting of inverted residual blocks
         self.cfgs = cfgs
@@ -147,32 +184,21 @@ class MobileNetV3(nn.Module):
         self.features = nn.Sequential(*layers)
         # building last several layers
         self.conv = conv_1x1_bn(input_channel, exp_size)
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         output_channel = {'large': 1280, 'small': 1024}
         output_channel = _make_divisible(output_channel[mode] * width_mult, 8) if width_mult > 1.0 else output_channel[mode]
-        self.regressor = nn.Sequential(
-            nn.Linear(exp_size, output_channel),
-            h_swish(),
-            nn.Linear(output_channel, num_points),
-        )
-        self.classifier = nn.Sequential(
-            nn.Linear(exp_size, output_channel),
-            h_swish(),
-            nn.Dropout(0.5),
-            nn.Linear(output_channel, num_classes),
-        )
-        self.sigmoid = nn.Sigmoid()
+        self.conv_head = nn.Conv2d(exp_size, output_channel, kernel_size=1, bias=False)
+        self.bn_head = nn.BatchNorm2d(num_features=output_channel)
+        self.non_linearity = h_swish()
+
         self._initialize_weights()
 
-    def forward(self, x):
+    def  extract_features(self, x):
         x = self.features(x)
         x = self.conv(x)
-        x = self.avgpool(x)
-        x = x.view(x.size(0), -1)
-        kp = self.regressor(x)
-        kp = self.sigmoid(kp)
-        targets = self.classifier(x)
-        return kp.view(x.shape[0],9,2), targets
+        x = self.conv_head(x)
+        x = self.non_linearity(self.bn_head(x))
+
+        return x
 
     def _initialize_weights(self):
         for m in self.modules():
@@ -189,6 +215,9 @@ class MobileNetV3(nn.Module):
                 if m.bias is not None:
                     m.bias.data.zero_()
 
+    def _init_fc(self, output_channel):
+        return nn.Linear(output_channel, self.num_points)
+
 def init_pretrained_weights(model, key=''):
     """Initializes model with pretrained weights.
 
@@ -199,11 +228,6 @@ def init_pretrained_weights(model, key=''):
     import errno
     import inspect
     import gdown
-
-    current_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-    parent_dir = os.path.dirname(current_dir)
-    sys.path.insert(0, parent_dir)
-    from  torchdet3d.utils import load_pretrained_weights
 
     def _get_torch_home():
         ENV_TORCH_HOME = 'TORCH_HOME'
@@ -234,56 +258,3 @@ def init_pretrained_weights(model, key=''):
         gdown.download(pretrained_urls[key], cached_file)
 
     load_pretrained_weights(model, cached_file)
-
-def mobilenetv3_large(pretrained=False, **kwargs):
-    """
-    Constructs a MobileNetV3-Large model
-    """
-    cfgs = [
-        # k, t, c, SE, HS, s
-        [3,   1,  16, 0, 0, 1],
-        [3,   4,  24, 0, 0, 2],
-        [3,   3,  24, 0, 0, 1],
-        [5,   3,  40, 1, 0, 2],
-        [5,   3,  40, 1, 0, 1],
-        [5,   3,  40, 1, 0, 1],
-        [3,   6,  80, 0, 1, 2],
-        [3, 2.5,  80, 0, 1, 1],
-        [3, 2.3,  80, 0, 1, 1],
-        [3, 2.3,  80, 0, 1, 1],
-        [3,   6, 112, 1, 1, 1],
-        [3,   6, 112, 1, 1, 1],
-        [5,   6, 160, 1, 1, 2],
-        [5,   6, 160, 1, 1, 1],
-        [5,   6, 160, 1, 1, 1]
-    ]
-
-    net = MobileNetV3(cfgs, mode='large', width_mult = 1., **kwargs)
-    if pretrained:
-        init_pretrained_weights(net, key='mobilenetv3_large')
-
-    return net
-
-def mobilenetv3_small(pretrained=False, **kwargs):
-    """
-    Constructs a MobileNetV3-Small model
-    """
-    cfgs = [
-        # k, t, c, SE, HS, s
-        [3,    1,  16, 1, 0, 2],
-        [3,  4.5,  24, 0, 0, 2],
-        [3, 3.67,  24, 0, 0, 1],
-        [5,    4,  40, 1, 1, 2],
-        [5,    6,  40, 1, 1, 1],
-        [5,    6,  40, 1, 1, 1],
-        [5,    3,  48, 1, 1, 1],
-        [5,    3,  48, 1, 1, 1],
-        [5,    6,  96, 1, 1, 2],
-        [5,    6,  96, 1, 1, 1],
-        [5,    6,  96, 1, 1, 1],
-    ]
-    net = MobileNetV3(cfgs, mode='small', width_mult = 1., **kwargs)
-    if pretrained:
-        init_pretrained_weights(net, key='mobilenetv3_small')
-
-    return net

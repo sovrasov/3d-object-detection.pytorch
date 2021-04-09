@@ -8,8 +8,8 @@ def build_optimizer(cfg, net):
         optim = torch.optim.Adadelta(net.parameters(), lr=cfg.optim.lr, rho=cfg.optim.rho,
                                      weight_decay=cfg.otim.wd)
     elif cfg.optim.name == 'adam':
-        optim = torch.optim.Adam(net.parameters(), lr=cfg.optim.lr, betas=cfg.optim.betas,
-                                 weight_decay=cfg.otim.wd)
+        optim = torch.optim.AdamW(net.parameters(), lr=cfg.optim.lr, betas=cfg.optim.betas,
+                                 weight_decay=cfg.optim.wd)
     elif cfg.optim.name == 'rmsprob':
         optim = torch.optim.RMSprop(net.parameters(), lr=cfg.optim.lr, weight_decay=cfg.optim.wd,
                                     centered=cfg.optim.centered, alpha=cfg.optim.alpha)

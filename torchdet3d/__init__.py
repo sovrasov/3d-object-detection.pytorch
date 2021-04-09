@@ -1,12 +1,12 @@
 from __future__ import absolute_import, print_function
-from .version import __version__
-
-from torchdet3d import builders, evaluation, dataloaders, trainer, models, utils
 
 import sys
 import os
 
-module_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../3rdparty/Objectron'))
+from torchdet3d import builders, evaluation, dataloaders, trainer, models, utils, losses
+from .version import __version__
+
+module_path = os.path.abspath(os.path.join(os.path.dirname('__init__.py'), '3rdparty/Objectron'))
 if module_path not in sys.path:
     sys.path.append(module_path)
 
