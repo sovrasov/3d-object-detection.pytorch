@@ -13,6 +13,8 @@ if __name__ == '__main__':
         'torchdet3d/models',
         'build',
         'deprecated'
+        '.history/',
+        'torchdet3d/models'
     ]
 
     to_pylint = []
