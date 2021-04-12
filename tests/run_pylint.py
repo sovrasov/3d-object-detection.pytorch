@@ -12,9 +12,9 @@ if __name__ == '__main__':
         'configs/detection',
         'torchdet3d/models',
         'build',
-        'deprecated'
-        '.history/',
-        'torchdet3d/models'
+        'deprecated',
+        '.history',
+        'torchdet3d/models',
     ]
 
     to_pylint = []
