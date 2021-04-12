@@ -1,5 +1,5 @@
 albumentations
-attrdict
+addict
 opencv-python
 numpy
 sklearn
