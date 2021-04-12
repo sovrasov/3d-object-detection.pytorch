@@ -38,6 +38,8 @@ def build_model(config, export_mode=False):
 
         if config.model.pretrained and not export_mode:
             load_pretrained_weights(model, weights_path)
+        if config.model.load_weights:
+            load_pretrained_weights(model, config.model.load_weights)
 
     elif config.model.name == 'mobilenetv3_large':
         params = model_params['mobilenetv3_large']
@@ -45,6 +47,8 @@ def build_model(config, export_mode=False):
                                 num_classes=config.model.num_classes, export_mode=export_mode, **params)
         if config.model.pretrained and not export_mode:
             init_pretrained_weights(model, key='mobilenetv3_large')
+        if config.model.load_weights:
+            load_pretrained_weights(model, config.model.load_weights)
 
     elif config.model.name == 'mobilenetv3_small':
         params = model_params['mobilenetv3_small']
@@ -52,6 +56,8 @@ def build_model(config, export_mode=False):
                                 num_classes=config.model.num_classes, export_mode=export_mode, **params)
         if config.model.pretrained and not export_mode:
             init_pretrained_weights(model, key='mobilenetv3_small')
+        if config.model.load_weights:
+            load_pretrained_weights(model, config.model.load_weights)
 
     return model
 
