@@ -34,6 +34,7 @@ def objective(cfg, args, trial):
     # Generate the trials.
     optimizer_name = trial.suggest_categorical("optimizer", ['rmsprop', 'adam', 'sgd'])
     lr = trial.suggest_float("lr", 1e-4, 1.6e-2, log=True)
+    print(f"next trial with {optimizer_name}, {lr}")
     cfg['optim']['name'] = optimizer_name
     cfg['optim']['lr'] = lr
     optimizer = build_optimizer(cfg, model)
@@ -143,8 +144,6 @@ def main():
     parser.add_argument('--config', type=str, default='./configs/default_config.py', help='path to config')
     parser.add_argument('--device', type=str, default='cuda', choices=['cuda','cpu'],
                         help='choose device to train on')
-    parser.add_argument('-b', '--batch_size', type=int, default=128,
-                        help='choose batch_size to train with')
     parser.add_argument('-e', '--epochs', type=int, default=30,
                         help='choose epochs to train with')
     parser.add_argument('--n_training_iterations', type=float, default=.6,
@@ -162,7 +161,7 @@ def main():
         sys.stdout = Logger(osp.join(cfg.output_dir, log_name))
     set_random_seed(cfg.utils.random_seeds)
 
-    study = optuna.create_study(study_name='regression task', direction="maximize")
+    study = optuna.create_study(study_name='regression task', direction="minimize")
     objective_partial = partial(objective, cfg, args)
     try:
         study.optimize(objective_partial, n_trials=20, timeout=None)
