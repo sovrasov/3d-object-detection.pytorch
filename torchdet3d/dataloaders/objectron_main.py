@@ -18,6 +18,7 @@ class Objectron(Dataset):
         self.transform = transform
         self.debug_mode = debug_mode
         self.mode = mode
+        self.num_classes = len(category_list)
 
         if mode == 'train':
             ann_path = Path(root_folder).resolve() / 'annotations/objectron_train.json'
@@ -49,7 +50,9 @@ class Objectron(Dataset):
         # get path to image from annotations
         raw_keypoints = self.annotations[indx]['keypoints']
         img_id = self.annotations[indx]['image_id']
-        category = int(self.annotations[indx]['category_id']) - 1
+        cat_id = int(self.annotations[indx]['category_id']) - 1
+        # in case when classes are not equal to 9 choose closest
+        category = min([i for i in range(self.num_classes)], key=lambda x:abs(x-cat_id))
         # get raw key points for bb from annotations
         img_path = self.root_folder + '/' + (self.images[img_id]['file_name'])
         # read image
