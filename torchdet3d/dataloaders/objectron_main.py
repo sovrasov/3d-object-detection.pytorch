@@ -160,10 +160,11 @@ def test():
         ds = Objectron(root, mode=mode, transform=transform, category_list=category_list)
         ic(len(ds))
         for  _, _, category in ds:
+            ic(OBJECTRON_CLASSES[category])
             assert OBJECTRON_CLASSES[category] in category_list
 
 
-    root = './data'
+    root = '/media/cluster_fs/user/vsovraso/data/objectron'
     normalization = A.augmentations.transforms.Normalize(**dict(mean=[0.5931, 0.4690, 0.4229],
                                                             std=[0.2471, 0.2214, 0.2157]))
     transform = A.Compose([ ConvertColor(),
