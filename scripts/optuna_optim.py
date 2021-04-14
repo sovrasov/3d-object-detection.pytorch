@@ -32,17 +32,17 @@ def objective(cfg, args, trial):
     if (torch.cuda.is_available() and args.device == 'cuda' and cfg.data_parallel.use_parallel):
         model = torch.nn.DataParallel(model, **cfg.data_parallel.parallel_params)
     # Generate the trials.
-    optimizer_name = trial.suggest_categorical("optimizer", ['rmsprop', 'adam', 'sgd'])
-    lr = trial.suggest_float("lr", 1e-4, 1.6e-2, log=True)
-    print(f"next trial with {optimizer_name}, {lr}")
-    cfg['optim']['name'] = optimizer_name
+    scheduler_name = trial.suggest_categorical("scheduler", ['exp', 'cosine', 'multistepLR'])
+    lr = trial.suggest_float("lr", 1e-4, 8e-3, log=True)
+    print(f"next trial with {scheduler_name}, {lr}")
+    cfg['scheduler']['name'] = scheduler_name
     cfg['optim']['lr'] = lr
     optimizer = build_optimizer(cfg, model)
+    scheduler = build_scheduler(cfg, optimizer)
 
     # Get the dataset.
     train_loader, val_loader, _ = build_loader(cfg)
     criterions = build_loss(cfg)
-    scheduler = build_scheduler(cfg, optimizer)
     loss_manager = LossManager(criterions, cfg.loss.coeffs, cfg.loss.alwa)
 
     # Training of the model.
@@ -146,9 +146,9 @@ def main():
                         help='choose device to train on')
     parser.add_argument('-e', '--epochs', type=int, default=30,
                         help='choose epochs to train with')
-    parser.add_argument('--n_training_iterations', type=float, default=.6,
+    parser.add_argument('--n_training_iterations', type=float, default=.5,
                         help='choose percentage of samples in each epoch to train with')
-    parser.add_argument('--n_validate_iterations', type=float, default=.6,
+    parser.add_argument('--n_validate_iterations', type=float, default=.5,
                             help='choose percentage of samples in each epoch to validate with')
 
     args = parser.parse_args()
@@ -164,7 +164,7 @@ def main():
     study = optuna.create_study(study_name='regression task', direction="minimize")
     objective_partial = partial(objective, cfg, args)
     try:
-        study.optimize(objective_partial, n_trials=20, timeout=None)
+        study.optimize(objective_partial, n_trials=30, timeout=None)
     finally:
         pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
         complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
