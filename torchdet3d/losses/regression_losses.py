@@ -37,8 +37,8 @@ class WingLoss(_Loss):
         loss = torch.abs(input_ - target)
         loss[loss < self.w] = self.wing_core(loss[loss < self.w], self.w, self.eps)
         loss[loss >= self.w] -= wing_const
-        diag_dist = compute_diag(target)
-        loss /= diag_dist.view(input_.size(0),1,1)
+        # diag_dist = compute_diag(target)
+        # loss /= diag_dist.view(input_.size(0),1,1)
 
         return torch.mean(loss)
 

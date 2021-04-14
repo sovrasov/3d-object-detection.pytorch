@@ -78,7 +78,7 @@ class Evaluator:
                     label=label)
 
     def val(self, epoch=None):
-        ''' procedure launching main validation'''
+        ''' procedure launching main validation '''
         ADD_meter = AverageMeter()
         SADD_meter = AverageMeter()
         ACC_meter = AverageMeter()
