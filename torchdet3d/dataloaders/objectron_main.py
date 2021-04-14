@@ -32,7 +32,7 @@ class Objectron(Dataset):
 
         # filter categories
         if category_list != 'all':
-            self.annotations = list(filter(lambda x: OBJECTRON_CLASSES[x['category_id']] in category_list, self.ann['annotations']))
+            self.annotations = list(filter(lambda x: OBJECTRON_CLASSES[x['category_id'] - 1] in category_list, self.ann['annotations']))
             images_id = {ann_obj['image_id'] for ann_obj in self.annotations}
             # create dict since ordering now different
             self.images = {img_obj['id']: img_obj
@@ -61,7 +61,7 @@ class Objectron(Dataset):
         # "print" image after crop with keypoints if needed
 
         if self.debug_mode:
-            draw_kp(image, unnormalized_keypoints, f'image_before_pipeline_{self.name}.jpg',
+            draw_kp(image, unnormalized_keypoints, f'/media/cluster_fs/user/kprokofi/experiments/3d-detection/debug/image_before_pipeline_{self.name}.jpg',
                     normalized=False, RGB=False)
         # given unnormalized keypoints crop object on image
         cropped_keypoints, cropped_img, crop_cords = self.crop(image, unnormalized_keypoints)
@@ -79,7 +79,7 @@ class Objectron(Dataset):
         # "print" image after crop with keypoints if needed
         if self.debug_mode:
             draw_kp(unnormalize_img(transformed_image).numpy(), transformed_keypoints.numpy(),
-                                    f'image_after_pipeline_{self.name}.jpg')
+                                    f'/media/cluster_fs/user/kprokofi/experiments/3d-detection/debug/image_after_pipeline_{self.name}.jpg')
 
         if self.mode == 'test':
             return (image,
@@ -163,7 +163,7 @@ def test():
             assert OBJECTRON_CLASSES[category] in category_list
 
 
-    root = '/media/cluster_fs/user/vsovraso/data/objectron'
+    root = './data'
     normalization = A.augmentations.transforms.Normalize(**dict(mean=[0.5931, 0.4690, 0.4229],
                                                             std=[0.2471, 0.2214, 0.2157]))
     transform = A.Compose([ ConvertColor(),
@@ -175,11 +175,11 @@ def test():
                             normalization,
                             ToTensor((290, 290)),
                           ],keypoint_params=A.KeypointParams(format='xy'))
-    for index in np.random.randint(0,60000,20):
-        super_vision_test(root, mode='val', transform=transform, index=index)
-    dataset_test(root, mode='val', transform=transform, batch_size=256)
-    dataset_test(root, mode='train', transform=transform, batch_size=256)
-    cat_filter_test(root, mode='val', transform=transform, category_list=['shoe, camera, bottle, bike'])
+    # for index in np.random.randint(0,60000,20):
+    #     super_vision_test(root, mode='val', transform=transform, index=index)
+    # dataset_test(root, mode='val', transform=transform, batch_size=256)
+    # dataset_test(root, mode='train', transform=transform, batch_size=256)
+    cat_filter_test(root, mode='val', transform=transform, category_list=['shoe', 'camera', 'bottle', 'bike'])
 
 if __name__ == '__main__':
     test()
