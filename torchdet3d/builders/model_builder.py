@@ -66,8 +66,9 @@ def model_wraper(model_class, output_channels, num_points=18,
     class ModelWrapper(model_class):
         def __init__(self, output_channel=output_channels, **kwargs):
             super().__init__(**kwargs)
+            max_classes = 9
             self.regressors = nn.ModuleList()
-            for _ in range(num_classes):
+            for _ in range(max_classes):
                 self.regressors.append(self._init_regressors(output_channel))
             self.classifier = nn.Sequential(
                 nn.Dropout(0.5),
