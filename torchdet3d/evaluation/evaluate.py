@@ -7,16 +7,14 @@ from dataclasses import dataclass
 from tqdm import tqdm
 from copy import deepcopy
 
-from .metrics import compute_average_distance, compute_accuracy
-from torchdet3d.utils import (AverageMeter, mkdir_if_missing, draw_kp)
+from .metrics import compute_accuracy, compute_average_distance, compute_metrics_per_cls
+from torchdet3d.utils import (AverageMeter, mkdir_if_missing, draw_kp, OBJECTRON_CLASSES)
 from torchdet3d.builders import build_augmentations
 from torchdet3d.dataloaders import Objectron
 
 module_path = os.path.abspath(os.path.join('/3rdparty/Objectron'))
 if module_path not in sys.path:
     sys.path.append(module_path)
-
-OBJECTRON_CLASSES = ('bike', 'book', 'bottle', 'cereal_box', 'camera', 'chair', 'cup', 'laptop', 'shoe')
 
 @dataclass
 class Evaluator:
@@ -27,6 +25,7 @@ class Evaluator:
     writer: object
     max_epoch: int
     device: str = 'cuda'
+    num_classes : int = 9
     samples: object = 'random'
     num_samples: int = 10
     path_to_save_imgs: str = './testing_images'
@@ -82,6 +81,9 @@ class Evaluator:
         ADD_meter = AverageMeter()
         SADD_meter = AverageMeter()
         ACC_meter = AverageMeter()
+        ADD_cls_meter = [AverageMeter() for cl in range(self.num_classes)]
+        SADD_cls_meter = [AverageMeter() for cl in range(self.num_classes)]
+        acc_cls_meter = [AverageMeter() for cl in range(self.num_classes)]
 
         # switch to eval mode
         self.model.eval()
@@ -93,17 +95,17 @@ class Evaluator:
             pred_kp, pred_cats = self.model(imgs, gt_cats)
             # measure metrics
             ADD, SADD = compute_average_distance(pred_kp, gt_kp)
+            for cl, ADD_cls, SADD_cls, acc_cls in compute_metrics_per_cls(pred_kp, gt_kp, gt_cats, pred_cats):
+                ADD_cls_meter[cl].update(ADD_cls, imgs.size(0))
+                SADD_cls_meter[cl].update(SADD_cls, imgs.size(0))
+                acc_cls_meter[cl].update(acc_cls, imgs.size(0))
+
             acc = compute_accuracy(pred_cats, gt_cats)
             # record loss
             ADD_meter.update(ADD, imgs.size(0))
             SADD_meter.update(SADD, imgs.size(0))
             ACC_meter.update(acc, imgs.size(0))
             if epoch is not None:
-                # write to writer for tensorboard
-                self.writer.add_scalar('Val/ADD', ADD_meter.avg, global_step=self.val_step)
-                self.writer.add_scalar('Val/SADD', SADD_meter.avg, global_step=self.val_step)
-                self.writer.add_scalar('Val/ACC', ACC_meter.avg, global_step=self.val_step)
-                self.val_step += 1
                 # update progress bar
                 loop.set_description(f'Val Epoch [{epoch}/{self.max_epoch}]')
                 loop.set_postfix(ADD=ADD, avr_ADD=ADD_meter.avg, SADD=SADD,
@@ -112,18 +114,36 @@ class Evaluator:
             if self.debug and it == self.debug_steps:
                 break
 
+        per_class_metr_message = ''
+        if epoch is not None:
+            # write to writer for tensorboard
+            self.writer.add_scalar('Val/ADD', ADD_meter.avg, global_step=self.val_step)
+            self.writer.add_scalar('Val/SADD', SADD_meter.avg, global_step=self.val_step)
+            self.writer.add_scalar('Val/ACC', ACC_meter.avg, global_step=self.val_step)
+        for cls_ in range(self.num_classes):
+            cl_str = OBJECTRON_CLASSES[cls_]
+            if epoch is not None:
+                self.writer.add_scalar(f'Val/ADD_{cl_str}', ADD_cls_meter[cl_str].avg, global_step=self.val_step)
+                self.writer.add_scalar(f'Val/SADD_{cl_str}', SADD_cls_meter[cl_str].avg, global_step=self.val_step)
+                self.writer.add_scalar(f'Val/ACC_{cl_str}', acc_cls_meter[cl_str].avg, global_step=self.val_step)
+                self.val_step += 1
+            per_class_metr_message += (f"\n***{cl_str}***:\nADD: {ADD_cls_meter[cls_].avg}\n"
+                                      f"SADD: {SADD_cls_meter[cls_].avg}\n"
+                                      f"naccuracy: {acc_cls_meter[cls_].avg}\n")
+
         ep_mess = f"epoch : {epoch}\n" if epoch is not None else ""
         print("\nComputed val metrics:\n"
               f"{ep_mess}"
-              f"ADD ---> {ADD_meter.avg}\n"
-              f"SADD ---> {SADD_meter.avg}\n"
-              f"classification accuracy ---> {ACC_meter.avg}")
+              f"ADD overall ---> {ADD_meter.avg}\n"
+              f"SADD overall ---> {SADD_meter.avg}\n"
+              f"classification accuracy overall ---> {ACC_meter.avg}\n"
+              f"{per_class_metr_message}")
 
     def run_eval_pipe(self, visual_only=False):
         print('.'*10,'Run evaluating protocol', '.'*10)
         if not visual_only:
             self.val()
-        self.visual_test()
+        # self.visual_test()
 
     @staticmethod
     def put_on_device(items, device):

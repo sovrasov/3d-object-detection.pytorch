@@ -9,8 +9,7 @@ import numpy as np
 from icecream import ic
 import albumentations as A
 
-from torchdet3d.utils import draw_kp, ToTensor, ConvertColor, unnormalize_img
-
+from torchdet3d.utils import draw_kp, ToTensor, ConvertColor, unnormalize_img, OBJECTRON_CLASSES
 
 class Objectron(Dataset):
     def __init__(self, root_folder, mode='train', transform=None, debug_mode=False, name='0', category_list='all'):
@@ -33,7 +32,7 @@ class Objectron(Dataset):
 
         # filter categories
         if category_list != 'all':
-            self.annotations = list(filter(lambda x: x['category_id'] in category_list, self.ann['annotations']))
+            self.annotations = list(filter(lambda x: OBJECTRON_CLASSES[x['category_id']] in category_list, self.ann['annotations']))
             images_id = {ann_obj['image_id'] for ann_obj in self.annotations}
             # create dict since ordering now different
             self.images = {img_obj['id']: img_obj
@@ -141,9 +140,7 @@ def test():
     "Perform dataloader test"
     def super_vision_test(root, mode='val', transform=None, index=7):
         ds = Objectron(root, mode=mode, transform=transform, debug_mode=True, name=str(index))
-        print(len(ds))
-        ds = Objectron(root, mode=mode, transform=transform, debug_mode=True, name=str(index), category_list=[1])
-        print(len(ds))
+        ic(len(ds))
         _, bbox, _ = ds[index]
         assert bbox.shape == (9,2)
 
@@ -159,7 +156,14 @@ def test():
         assert img_tensor.shape == (batch_size, 3, 290, 290)
         assert bbox.shape == (batch_size, 9, 2)
 
-    root = './data_cereal_box'
+    def cat_filter_test(root, mode='val', transform=None, category_list=['book']):
+        ds = Objectron(root, mode=mode, transform=transform, category_list=category_list)
+        ic(len(ds))
+        for  _, _, category in ds:
+            assert OBJECTRON_CLASSES[category] in category_list
+
+
+    root = '/media/cluster_fs/user/vsovraso/data/objectron'
     normalization = A.augmentations.transforms.Normalize(**dict(mean=[0.5931, 0.4690, 0.4229],
                                                             std=[0.2471, 0.2214, 0.2157]))
     transform = A.Compose([ ConvertColor(),
@@ -171,10 +175,11 @@ def test():
                             normalization,
                             ToTensor((290, 290)),
                           ],keypoint_params=A.KeypointParams(format='xy'))
-    for index in np.random.randint(0,60000,1):
-        super_vision_test(root, mode='train', transform=transform, index=index)
+    for index in np.random.randint(0,60000,20):
+        super_vision_test(root, mode='val', transform=transform, index=index)
     dataset_test(root, mode='val', transform=transform, batch_size=256)
     dataset_test(root, mode='train', transform=transform, batch_size=256)
+    cat_filter_test(root, mode='val', transform=transform, category_list=['shoe, camera, bottle, bike'])
 
 if __name__ == '__main__':
     test()
