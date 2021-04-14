@@ -143,7 +143,7 @@ class Evaluator:
         print('.'*10,'Run evaluating protocol', '.'*10)
         if not visual_only:
             self.val()
-        # self.visual_test()
+        self.visual_test()
 
     @staticmethod
     def put_on_device(items, device):

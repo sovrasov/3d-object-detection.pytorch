@@ -1,4 +1,10 @@
 import argparse
+import inspect
+import os.path as osp
+from threading import Thread
+import queue
+import os
+import sys
 
 import cv2 as cv
 import glog as log
@@ -12,11 +18,23 @@ from torchdet3d.utils import draw_kp
 OBJECTRON_CLASSES = ('bike', 'book', 'bottle', 'cereal_box', 'camera', 'chair', 'cup', 'laptop', 'shoe')
 
 class Detector:
-    """Wrapper class for object detector"""
+    """Wrapper class for face detector"""
     def __init__(self, ie,  model_path, conf=.6, device='CPU', ext_path=''):
         self.net = load_ie_model(ie, model_path, device, None, ext_path)
         self.confidence = conf
         self.expand_ratio = (1., 1.)
+
+    def run_async(self, frame):
+        self.frame_shape = frame.shape
+        self.net.forward_async(frame)
+
+    def wait_and_grab(self):
+        outputs = self.net.grab_all_async()
+        detections = []
+        for out in outputs:
+            detection = self.__decode_detections(out, self.frame_shape)
+            detections.append(detection)
+        return detections
 
     def get_detections(self, frame):
         """Returns all detections on frame"""
@@ -61,7 +79,7 @@ class Regressor:
     def get_detections(self, frame, detections):
         """Returns all detections on frame"""
         outputs = []
-        for rect in detections:
+        for rect in detections[0]:
             cropped_img = self.crop(frame, rect[0])
             out = self.net.forward(cropped_img)
             out = self.__decode_detections(out, rect)
@@ -94,7 +112,7 @@ class Regressor:
 
 def draw_detections(frame, reg_detections, det_detections, reg_only=True):
     """Draws detections and labels"""
-    for det_out, reg_out in zip(det_detections, reg_detections):
+    for det_out, reg_out in zip(det_detections[0], reg_detections):
         left, top, right, bottom = det_out[0]
         kp = reg_out[0]
         label = reg_out[1]
@@ -113,25 +131,33 @@ def draw_detections(frame, reg_detections, det_detections, reg_only=True):
 
 def run(params, capture, detector, regressor, write_video=False, resolution = (1280, 720)):
     """Starts the 3D object detection demo"""
-    fourcc = cv.VideoWriter_fourcc(*'MP4V')
     fps = 24
+    fourcc = cv.VideoWriter_fourcc('M','J','P','G')
     if write_video:
         writer_video = cv.VideoWriter('output_video_demo.mp4', fourcc, fps, resolution)
     win_name = '3D-object-detection'
+    has_frame, prev_frame = capture.read()
+    prev_frame = cv.resize(prev_frame, resolution)
+    if not has_frame:
+        return
+    detector.run_async(prev_frame)
     while cv.waitKey(1) != 27:
         has_frame, frame = capture.read()
-        frame = cv.resize(frame, resolution)
         if not has_frame:
             return
-        detections = detector.get_detections(frame)
-        outputs = regressor.get_detections(frame, detections)
+        frame = cv.resize(frame, resolution)
+        detections = detector.wait_and_grab()
+        detector.run_async(frame)
+        outputs = regressor.get_detections(prev_frame, detections)
 
-        frame = draw_detections(frame, outputs, detections, reg_only=False)
-        cv.imshow(win_name, frame)
+        vis = draw_detections(prev_frame, outputs, detections, reg_only=False)
+        cv.imshow(win_name, vis)
         if write_video:
-            writer_video.write(cv.resize(frame, resolution))
-            writer_video.release()
+            writer_video.write(vis)
+        prev_frame, frame = frame, prev_frame
+
     capture.release()
+    writer_video.release()
     cv.destroyAllWindows()
 
 def main():
@@ -145,13 +171,13 @@ def main():
                         help='Configuration file')
     parser.add_argument('--od_model', type=str, required=True)
     parser.add_argument('--reg_model', type=str, required=True)
-    parser.add_argument('--det_tresh', type=float, required=False, default=0.6)
+    parser.add_argument('--det_tresh', type=float, required=False, default=0.7)
     parser.add_argument('--device', type=str, default='CPU')
     parser.add_argument('-l', '--cpu_extension',
                         help='MKLDNN (CPU)-targeted custom layers.Absolute path to a shared library with the kernels '
                              'impl.', type=str, default=None)
-    parser.add_argument('--write_video', type=bool, default=False,
-                        help='if you set this arg to True, the video of the demo will be recoreded')
+    parser.add_argument('--write_video', action='store_true',
+                        help='wether or not to record demo video')
     args = parser.parse_args()
 
     if args.cam_id >= 0:

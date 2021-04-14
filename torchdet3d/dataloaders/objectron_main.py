@@ -61,7 +61,7 @@ class Objectron(Dataset):
         # "print" image after crop with keypoints if needed
 
         if self.debug_mode:
-            draw_kp(image, unnormalized_keypoints, f'/media/cluster_fs/user/kprokofi/experiments/3d-detection/debug/image_before_pipeline_{self.name}.jpg',
+            draw_kp(image, unnormalized_keypoints, f'image_before_pipeline_{self.name}.jpg',
                     normalized=False, RGB=False)
         # given unnormalized keypoints crop object on image
         cropped_keypoints, cropped_img, crop_cords = self.crop(image, unnormalized_keypoints)
@@ -79,7 +79,7 @@ class Objectron(Dataset):
         # "print" image after crop with keypoints if needed
         if self.debug_mode:
             draw_kp(unnormalize_img(transformed_image).numpy(), transformed_keypoints.numpy(),
-                                    f'/media/cluster_fs/user/kprokofi/experiments/3d-detection/debug/image_after_pipeline_{self.name}.jpg')
+                                    f'image_after_pipeline_{self.name}.jpg')
 
         if self.mode == 'test':
             return (image,
@@ -158,13 +158,13 @@ def test():
 
     def cat_filter_test(root, mode='val', transform=None, category_list=['book']):
         ds = Objectron(root, mode=mode, transform=transform, category_list=category_list)
-        ic(len(ds))
-        for  _, _, category in ds:
-            ic(OBJECTRON_CLASSES[category])
-            assert OBJECTRON_CLASSES[category] in category_list
+        dataloader = DataLoader(ds, batch_size=128, shuffle=True)
+        for  _, _, category in dataloader:
+            for cat in category:
+                assert OBJECTRON_CLASSES[cat] in category_list
 
 
-    root = '/media/cluster_fs/user/vsovraso/data/objectron'
+    root = './data'
     normalization = A.augmentations.transforms.Normalize(**dict(mean=[0.5931, 0.4690, 0.4229],
                                                             std=[0.2471, 0.2214, 0.2157]))
     transform = A.Compose([ ConvertColor(),
@@ -176,11 +176,11 @@ def test():
                             normalization,
                             ToTensor((290, 290)),
                           ],keypoint_params=A.KeypointParams(format='xy'))
-    # for index in np.random.randint(0,60000,20):
-    #     super_vision_test(root, mode='val', transform=transform, index=index)
-    # dataset_test(root, mode='val', transform=transform, batch_size=256)
-    # dataset_test(root, mode='train', transform=transform, batch_size=256)
-    cat_filter_test(root, mode='val', transform=transform, category_list=['shoe', 'camera', 'bottle', 'bike'])
+    for index in np.random.randint(0,10000,20):
+        super_vision_test(root, mode='val', transform=transform, index=index)
+    dataset_test(root, mode='val', transform=transform, batch_size=256)
+    dataset_test(root, mode='train', transform=transform, batch_size=256)
+    # cat_filter_test(root, mode='val', transform=transform, category_list=['shoe', 'camera', 'bottle', 'bike'])
 
 if __name__ == '__main__':
     test()
