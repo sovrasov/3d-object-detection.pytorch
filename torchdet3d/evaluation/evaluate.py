@@ -123,13 +123,13 @@ class Evaluator:
         for cls_ in range(self.num_classes):
             cl_str = OBJECTRON_CLASSES[cls_]
             if epoch is not None:
-                self.writer.add_scalar(f'Val/ADD_{cl_str}', ADD_cls_meter[cl_str].avg, global_step=self.val_step)
-                self.writer.add_scalar(f'Val/SADD_{cl_str}', SADD_cls_meter[cl_str].avg, global_step=self.val_step)
-                self.writer.add_scalar(f'Val/ACC_{cl_str}', acc_cls_meter[cl_str].avg, global_step=self.val_step)
+                self.writer.add_scalar(f'Val/ADD_{cl_str}', ADD_cls_meter[cls_].avg, global_step=self.val_step)
+                self.writer.add_scalar(f'Val/SADD_{cl_str}', SADD_cls_meter[cls_].avg, global_step=self.val_step)
+                self.writer.add_scalar(f'Val/ACC_{cl_str}', acc_cls_meter[cls_].avg, global_step=self.val_step)
                 self.val_step += 1
             per_class_metr_message += (f"\n***{cl_str}***:\nADD: {ADD_cls_meter[cls_].avg}\n"
                                       f"SADD: {SADD_cls_meter[cls_].avg}\n"
-                                      f"naccuracy: {acc_cls_meter[cls_].avg}\n")
+                                      f"accuracy: {acc_cls_meter[cls_].avg}\n")
 
         ep_mess = f"epoch : {epoch}\n" if epoch is not None else ""
         print("\nComputed val metrics:\n"

@@ -37,6 +37,7 @@ def main():
 
     # init main components
     net = build_model(cfg)
+    # TO DO resume from chkpt opportunity
     net.to(args.device)
     if (torch.cuda.is_available() and args.device == 'cuda' and cfg.data_parallel.use_parallel):
         net = torch.nn.DataParallel(net, **cfg.data_parallel.parallel_params)
