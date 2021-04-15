@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from tqdm import tqdm
 from copy import deepcopy
 
-from .metrics import compute_average_distance, compute_accuracy
+from .metrics import compute_average_distance, compute_accuracy, compute_2d_based_iou
 from torchdet3d.utils import (AverageMeter, mkdir_if_missing, draw_kp)
 from torchdet3d.builders import build_augmentations
 from torchdet3d.dataloaders import Objectron
@@ -76,12 +76,13 @@ class Evaluator:
                     RGB=False,
                     normalized=False,
                     label=label)
-
+    @torch.no_grad()
     def val(self, epoch=None):
         ''' procedure launching main validation'''
         ADD_meter = AverageMeter()
         SADD_meter = AverageMeter()
         ACC_meter = AverageMeter()
+        IOU_meter = AverageMeter()
 
         # switch to eval mode
         self.model.eval()
@@ -93,16 +94,19 @@ class Evaluator:
             pred_kp, pred_cats = self.model(imgs, gt_cats)
             # measure metrics
             ADD, SADD = compute_average_distance(pred_kp, gt_kp)
+            IOU = compute_2d_based_iou(pred_kp, gt_kp)
             acc = compute_accuracy(pred_cats, gt_cats)
             # record loss
             ADD_meter.update(ADD, imgs.size(0))
             SADD_meter.update(SADD, imgs.size(0))
             ACC_meter.update(acc, imgs.size(0))
+            IOU_meter.update(IOU)
             if epoch is not None:
                 # write to writer for tensorboard
                 self.writer.add_scalar('Val/ADD', ADD_meter.avg, global_step=self.val_step)
                 self.writer.add_scalar('Val/SADD', SADD_meter.avg, global_step=self.val_step)
                 self.writer.add_scalar('Val/ACC', ACC_meter.avg, global_step=self.val_step)
+                self.writer.add_scalar('Val/IOU', IOU_meter.avg, global_step=self.val_step)
                 self.val_step += 1
                 # update progress bar
                 loop.set_description(f'Val Epoch [{epoch}/{self.max_epoch}]')
@@ -117,6 +121,7 @@ class Evaluator:
               f"{ep_mess}"
               f"ADD ---> {ADD_meter.avg}\n"
               f"SADD ---> {SADD_meter.avg}\n"
+              f"IOU ---> {IOU_meter.avg}\n"
               f"classification accuracy ---> {ACC_meter.avg}")
 
     def run_eval_pipe(self, visual_only=False):

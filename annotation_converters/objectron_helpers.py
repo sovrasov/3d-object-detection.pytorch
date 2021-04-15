@@ -91,7 +91,7 @@ def grab_frames(video_file, frame_ids, use_opencv=True):
                 '-pix_fmt', 'rgb24', '-vcodec', 'rawvideo', '-vsync', 'vfr', '-'
             ]
             pipe = subprocess.Popen(
-                command, stdout=subprocess.PIPE, bufsize=151 * frame_size)
+                command, stdout=subprocess.PIPE, bufsize=151 * frame_size, stderr=subprocess.DEVNULL)
             current_frame = np.frombuffer(
                 pipe.stdout.read(frame_size), dtype='uint8').reshape(height, width, 3)
             pipe.stdout.flush()

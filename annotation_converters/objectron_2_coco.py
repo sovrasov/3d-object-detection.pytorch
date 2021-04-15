@@ -87,9 +87,9 @@ def save_2_coco(output_root, subset_name, data_info, obj_classes, fps_divisor,
     ann_folder = osp.join(output_root, 'annotations')
     img_folder = osp.join(output_root, 'images')
     if not osp.isdir(ann_folder):
-        os.mkdir(ann_folder)
+        os.makedirs(ann_folder, exist_ok=True)
     if not osp.isdir(img_folder):
-        os.mkdir(img_folder)
+        os.makedirs(img_folder, exist_ok=True)
 
     img_id = 0
     ann_id = 0
@@ -142,8 +142,9 @@ def save_2_coco(output_root, subset_name, data_info, obj_classes, fps_divisor,
                 frames[frame_idx] = cv.resize(frames[frame_idx], (w, h))
                 for kp_pixel in keypoints[0]:
                     cv.circle(frames[frame_idx], (kp_pixel[0], kp_pixel[1]), 5, (255, 0, 0), -1)
-                for kp_pixel in keypoints[1]:
-                    cv.circle(frames[frame_idx], (kp_pixel[0], kp_pixel[1]), 5, (0, 0, 255), -1)
+                if len(keypoints) > 1:
+                    for kp_pixel in keypoints[1]:
+                        cv.circle(frames[frame_idx], (kp_pixel[0], kp_pixel[1]), 5, (0, 0, 255), -1)
                 for bbox in bboxes:
                     if bbox is not None:
                         cv.rectangle(frames[frame_idx], (bbox[0], bbox[1]),
