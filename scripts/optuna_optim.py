@@ -32,11 +32,18 @@ def objective(cfg, args, trial):
     if (torch.cuda.is_available() and args.device == 'cuda' and cfg.data_parallel.use_parallel):
         model = torch.nn.DataParallel(model, **cfg.data_parallel.parallel_params)
     # Generate the trials.
-    scheduler_name = trial.suggest_categorical("scheduler", ['exp', 'cosine', 'multistepLR'])
-    lr = trial.suggest_float("lr", 1e-4, 8e-3, log=True)
-    print(f"next trial with {scheduler_name}, {lr}")
-    cfg['scheduler']['name'] = scheduler_name
-    cfg['optim']['lr'] = lr
+    steps = trial.suggest_categorical("steps", [[40,60,90], [50,70,90], [60,75,90], [70,80,90], [30], [50], [70]])
+    epoch = trial.suggest_int("epochs", 100, 300)
+    gamma = trial.suggest_categorical("gamma", [i/10 for i in range(1,7)])
+    if len(steps) == 3:
+        cfg['scheduler']['name'] = 'multistepLR'
+    else:
+        cfg['scheduler']['name'] = 'stepLR'
+    cfg['scheduler']['steps'] = steps
+    cfg['scheduler']['gamma'] = gamma
+    args.epochs = epoch
+    print(f"\nnext trial with [steps: {steps}, epochs: {epoch}, gamma: {gamma}]")
+
     optimizer = build_optimizer(cfg, model)
     scheduler = build_scheduler(cfg, optimizer)
 
@@ -48,8 +55,8 @@ def objective(cfg, args, trial):
     # Training of the model.
     max_iter_train = len(train_loader)
     max_iter_val = len(val_loader)
-    num_iters_train = min(max_iter_train, args.n_training_iterations * max_iter_train)
-    num_iters_val = min(max_iter_val, args.n_validate_iterations * max_iter_val)
+    num_iters_train = min(max_iter_train, int(args.n_training_iterations * max_iter_train))
+    num_iters_val = min(max_iter_val, int(args.n_validate_iterations * max_iter_val))
 
     for epoch in range(args.epochs):
         losses = AverageMeter()
@@ -164,7 +171,7 @@ def main():
     study = optuna.create_study(study_name='regression task', direction="minimize")
     objective_partial = partial(objective, cfg, args)
     try:
-        study.optimize(objective_partial, n_trials=30, timeout=None)
+        study.optimize(objective_partial, n_trials=100, timeout=None)
     finally:
         pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
         complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
