@@ -5,20 +5,15 @@ import datetime
 import time
 
 import torch
-from torchvision import datasets
-from torchvision import transforms
 import optuna
 from optuna.trial import TrialState
 from functools import partial
-from icecream import ic
 
 from torchdet3d.builders import (build_loader, build_model, build_loss,
                                     build_optimizer, build_scheduler)
-from torchdet3d.evaluation import Evaluator, compute_average_distance, compute_accuracy
+from torchdet3d.evaluation import compute_average_distance, compute_accuracy
 from torchdet3d.losses import LossManager
-from torchdet3d.trainer import Trainer
 from torchdet3d.utils import AverageMeter, read_py_config, Logger, set_random_seed
-import numpy as np
 
 def put_on_device(items, device):
     for i, item in enumerate(items):

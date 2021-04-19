@@ -3,7 +3,6 @@ import datetime
 
 from tqdm import tqdm
 from dataclasses import dataclass
-import torch
 
 from torchdet3d.evaluation import compute_average_distance, compute_accuracy
 from torchdet3d.utils import AverageMeter, save_snap

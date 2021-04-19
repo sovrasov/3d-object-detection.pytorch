@@ -33,7 +33,8 @@ class Objectron(Dataset):
 
         # filter categories
         if category_list != 'all':
-            self.annotations = list(filter(lambda x: OBJECTRON_CLASSES[x['category_id'] - 1] in category_list, self.ann['annotations']))
+            self.annotations = list(filter(lambda x: OBJECTRON_CLASSES[x['category_id'] - 1] in
+                                                category_list, self.ann['annotations']))
             images_id = {ann_obj['image_id'] for ann_obj in self.annotations}
             # create dict since ordering now different
             self.images = {img_obj['id']: img_obj
@@ -52,7 +53,7 @@ class Objectron(Dataset):
         img_id = self.annotations[indx]['image_id']
         cat_id = int(self.annotations[indx]['category_id']) - 1
         # in case when classes are not equal to 9 choose closest
-        category = min([i for i in range(self.num_classes)], key=lambda x:abs(x-cat_id))
+        category = min(range(self.num_classes), key=lambda x:abs(x-cat_id))
         # get raw key points for bb from annotations
         img_path = self.root_folder + '/' + (self.images[img_id]['file_name'])
         # read image
@@ -162,10 +163,14 @@ def test():
     def cat_filter_test(root, mode='val', transform=None, category_list=['book']):
         ds = Objectron(root, mode=mode, transform=transform, category_list=category_list)
         dataloader = DataLoader(ds, batch_size=128, shuffle=True)
-        for  _, _, category in dataloader:
-            for cat in category:
-                assert OBJECTRON_CLASSES[cat] in category_list
-
+        ic(len(dataloader))
+        def in_func(cat):
+            assert OBJECTRON_CLASSES[cat] in category_list
+        for i, (_, _, category) in enumerate(dataloader):
+            ic(i)
+            if i == len(dataloader) // 10:
+                break
+            map(in_func, category)
 
     root = './data'
     normalization = A.augmentations.transforms.Normalize(**dict(mean=[0.5931, 0.4690, 0.4229],
@@ -183,7 +188,7 @@ def test():
         super_vision_test(root, mode='val', transform=transform, index=index)
     dataset_test(root, mode='val', transform=transform, batch_size=256)
     dataset_test(root, mode='train', transform=transform, batch_size=256)
-    # cat_filter_test(root, mode='val', transform=transform, category_list=['shoe', 'camera', 'bottle', 'bike'])
+    cat_filter_test(root, mode='val', transform=transform, category_list=['shoe', 'camera', 'bottle', 'bike'])
 
 if __name__ == '__main__':
     test()

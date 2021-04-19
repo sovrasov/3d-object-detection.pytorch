@@ -1,10 +1,4 @@
 import argparse
-import inspect
-import os.path as osp
-from threading import Thread
-import queue
-import os
-import sys
 
 import cv2 as cv
 import glog as log

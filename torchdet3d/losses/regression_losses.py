@@ -101,7 +101,8 @@ class LossManager:
             cls_std = torch.std(torch.stack(self.s_cls))
             reg_mean = torch.mean(torch.stack(self.s_reg))
             reg_std = torch.std(torch.stack(self.s_reg))
-            self.s_cls.clear(); self.s_reg.clear()
+            self.s_cls.clear()
+            self.s_reg.clear()
             if self.alwa_version == 'ver_1':
                 cls = cls_mean + cls_std
                 reg = reg_mean + reg_std

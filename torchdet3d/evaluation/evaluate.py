@@ -84,7 +84,7 @@ class Evaluator:
         IOU_meter = AverageMeter()
         ADD_cls_meter = [AverageMeter() for cl in range(self.num_classes)]
         SADD_cls_meter = [AverageMeter() for cl in range(self.num_classes)]
-        acc_cls_meter = [AverageMeter() for cl in range(self.num_classes)]
+        ACC_cls_meter = [AverageMeter() for cl in range(self.num_classes)]
         IOU__cls_meter = [AverageMeter() for cl in range(self.num_classes)]
 
         # switch to eval mode
@@ -98,23 +98,24 @@ class Evaluator:
             # measure metrics
             ADD, SADD = compute_average_distance(pred_kp, gt_kp)
             IOU = compute_2d_based_iou(pred_kp, gt_kp)
-            acc = compute_accuracy(pred_cats, gt_cats)
+            ACC = compute_accuracy(pred_cats, gt_cats)
 
-            for cl, ADD_cls, SADD_cls, acc_cls in compute_metrics_per_cls(pred_kp, gt_kp, pred_cats, gt_cats):
+            for cl, ADD_cls, SADD_cls, ACC_cls in compute_metrics_per_cls(pred_kp, gt_kp, pred_cats, gt_cats):
                 ADD_cls_meter[cl].update(ADD_cls, imgs.size(0))
                 SADD_cls_meter[cl].update(SADD_cls, imgs.size(0))
-                acc_cls_meter[cl].update(acc_cls, imgs.size(0))
+                ACC_cls_meter[cl].update(ACC_cls, imgs.size(0))
+                IOU__cls_meter[cl].update(IOU, imgs.size(0))
 
             # record loss
             ADD_meter.update(ADD, imgs.size(0))
             SADD_meter.update(SADD, imgs.size(0))
-            ACC_meter.update(acc, imgs.size(0))
+            ACC_meter.update(ACC, imgs.size(0))
             IOU_meter.update(IOU)
             if epoch is not None:
                 # update progress bar
                 loop.set_description(f'Val Epoch [{epoch}/{self.max_epoch}]')
                 loop.set_postfix(ADD=ADD, avr_ADD=ADD_meter.avg, SADD=SADD,
-                                    avr_SADD=SADD_meter.avg, acc=acc, acc_avg = ACC_meter.avg)
+                                    avr_SADD=SADD_meter.avg, acc=ACC, acc_avg = ACC_meter.avg)
 
             if self.debug and it == self.debug_steps:
                 break
@@ -125,16 +126,19 @@ class Evaluator:
             self.writer.add_scalar('Val/ADD', ADD_meter.avg, global_step=self.val_step)
             self.writer.add_scalar('Val/SADD', SADD_meter.avg, global_step=self.val_step)
             self.writer.add_scalar('Val/ACC', ACC_meter.avg, global_step=self.val_step)
+            self.writer.add_scalar('Val/IOU', IOU_meter.avg, global_step=self.val_step)
         for cls_ in range(self.num_classes):
             cl_str = OBJECTRON_CLASSES[cls_]
             if epoch is not None:
                 self.writer.add_scalar(f'Val/ADD_{cl_str}', ADD_cls_meter[cls_].avg, global_step=self.val_step)
                 self.writer.add_scalar(f'Val/SADD_{cl_str}', SADD_cls_meter[cls_].avg, global_step=self.val_step)
-                self.writer.add_scalar(f'Val/ACC_{cl_str}', acc_cls_meter[cls_].avg, global_step=self.val_step)
+                self.writer.add_scalar(f'Val/ACC_{cl_str}', ACC_cls_meter[cls_].avg, global_step=self.val_step)
+                self.writer.add_scalar(f'Val/IOU_{cl_str}', IOU__cls_meter[cls_].avg, global_step=self.val_step)
                 self.val_step += 1
             per_class_metr_message += (f"\n***{cl_str}***:\nADD: {ADD_cls_meter[cls_].avg}\n"
                                       f"SADD: {SADD_cls_meter[cls_].avg}\n"
-                                      f"accuracy: {acc_cls_meter[cls_].avg}\n")
+                                      f"IOU: {IOU__cls_meter[cls_].avg}\n"
+                                      f"accuracy: {ACC_cls_meter[cls_].avg}\n")
 
         ep_mess = f"epoch : {epoch}\n" if epoch is not None else ""
         print("\nComputed val metrics:\n"
