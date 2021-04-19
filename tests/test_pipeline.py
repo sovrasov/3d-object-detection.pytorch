@@ -4,7 +4,7 @@ from torchdet3d.evaluation import (compute_average_distance, compute_metrics_per
                                     compute_2d_based_iou, compute_accuracy)
 
 from torchdet3d.losses import WingLoss, ADD_loss, DiagLoss
-from torchdet3d.builders import (build_loss, build_optimizer, build_scheduler, build_loader,
+from torchdet3d.builders import (build_loss, build_optimizer, build_scheduler,
                                     build_model, AVAILABLE_LOSS, AVAILABLE_OPTIMS, AVAILABLE_SCHEDS)
 from torchdet3d.utils import read_py_config
 

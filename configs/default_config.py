@@ -19,7 +19,8 @@ optim = dict(name='adam', lr=0.001, momentum=0.9, wd=1e-4, betas=(0.9, 0.999), r
 
 scheduler = dict(name='cosine', gamma=0.1, exp_gamma=0.975, steps=[50])
 
-loss=dict(names=['smoothl1',  'cross_entropy'], coeffs=([1.],[1.]), smoothl1_beta=0.2, alwa=dict(use=False, lam_cls=1., lam_reg=1., C=100, compute_std=True))
+loss=dict(names=['smoothl1',  'cross_entropy'], coeffs=([1.],[1.]), smoothl1_beta=0.2,
+                alwa=dict(use=False, lam_cls=1., lam_reg=1., C=100, compute_std=True))
 
 output_dir = './output/log'
 

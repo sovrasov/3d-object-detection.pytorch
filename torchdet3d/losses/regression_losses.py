@@ -1,7 +1,6 @@
 import math
 
 import torch
-from icecream import ic
 from torch.nn.modules.loss import _Loss
 
 __all__ = ['DiagLoss', 'ADD_loss', 'WingLoss', 'LossManager']
