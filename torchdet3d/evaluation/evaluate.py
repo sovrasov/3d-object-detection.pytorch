@@ -1,6 +1,3 @@
-import sys
-import os
-
 import torch
 import numpy as np
 from dataclasses import dataclass
@@ -12,9 +9,6 @@ from torchdet3d.utils import (AverageMeter, mkdir_if_missing, draw_kp, OBJECTRON
 from torchdet3d.builders import build_augmentations
 from torchdet3d.dataloaders import Objectron
 
-module_path = os.path.abspath(os.path.join('/3rdparty/Objectron'))
-if module_path not in sys.path:
-    sys.path.append(module_path)
 
 @dataclass
 class Evaluator:
@@ -25,7 +19,7 @@ class Evaluator:
     writer: object
     max_epoch: int
     device: str = 'cuda'
-    num_classes : int = 9
+    num_classes : int = len(OBJECTRON_CLASSES)
     samples: object = 'random'
     num_samples: int = 10
     path_to_save_imgs: str = './testing_images'
@@ -85,7 +79,7 @@ class Evaluator:
         ADD_cls_meter = [AverageMeter() for cl in range(self.num_classes)]
         SADD_cls_meter = [AverageMeter() for cl in range(self.num_classes)]
         ACC_cls_meter = [AverageMeter() for cl in range(self.num_classes)]
-        IOU__cls_meter = [AverageMeter() for cl in range(self.num_classes)]
+        IOU_cls_meter = [AverageMeter() for cl in range(self.num_classes)]
 
         # switch to eval mode
         self.model.eval()
@@ -100,17 +94,17 @@ class Evaluator:
             IOU = compute_2d_based_iou(pred_kp, gt_kp)
             ACC = compute_accuracy(pred_cats, gt_cats)
 
-            for cl, ADD_cls, SADD_cls, ACC_cls in compute_metrics_per_cls(pred_kp, gt_kp, pred_cats, gt_cats):
+            for cl, ADD_cls, SADD_cls, IOU_cls, ACC_cls in compute_metrics_per_cls(pred_kp, gt_kp, pred_cats, gt_cats):
                 ADD_cls_meter[cl].update(ADD_cls, imgs.size(0))
                 SADD_cls_meter[cl].update(SADD_cls, imgs.size(0))
                 ACC_cls_meter[cl].update(ACC_cls, imgs.size(0))
-                IOU__cls_meter[cl].update(IOU, imgs.size(0))
+                IOU_cls_meter[cl].update(IOU_cls, imgs.size(0))
 
             # record loss
             ADD_meter.update(ADD, imgs.size(0))
             SADD_meter.update(SADD, imgs.size(0))
             ACC_meter.update(ACC, imgs.size(0))
-            IOU_meter.update(IOU)
+            IOU_meter.update(IOU, imgs.size(0))
             if epoch is not None:
                 # update progress bar
                 loop.set_description(f'Val Epoch [{epoch}/{self.max_epoch}]')
@@ -133,11 +127,11 @@ class Evaluator:
                 self.writer.add_scalar(f'Val/ADD_{cl_str}', ADD_cls_meter[cls_].avg, global_step=self.val_step)
                 self.writer.add_scalar(f'Val/SADD_{cl_str}', SADD_cls_meter[cls_].avg, global_step=self.val_step)
                 self.writer.add_scalar(f'Val/ACC_{cl_str}', ACC_cls_meter[cls_].avg, global_step=self.val_step)
-                self.writer.add_scalar(f'Val/IOU_{cl_str}', IOU__cls_meter[cls_].avg, global_step=self.val_step)
+                self.writer.add_scalar(f'Val/IOU_{cl_str}', IOU_cls_meter[cls_].avg, global_step=self.val_step)
                 self.val_step += 1
             per_class_metr_message += (f"\n***{cl_str}***:\nADD: {ADD_cls_meter[cls_].avg}\n"
                                       f"SADD: {SADD_cls_meter[cls_].avg}\n"
-                                      f"IOU: {IOU__cls_meter[cls_].avg}\n"
+                                      f"IOU: {IOU_cls_meter[cls_].avg}\n"
                                       f"accuracy: {ACC_cls_meter[cls_].avg}\n")
 
         ep_mess = f"epoch : {epoch}\n" if epoch is not None else ""

@@ -41,10 +41,12 @@ def compute_metrics_per_cls(pred_kp, gt_kp, pred_cats, gt_cats, **kwargs):
         ADD, SADD = compute_average_distance(pred_kp[gt_cats == cl],
                                              gt_kp[gt_cats == cl],
                                              **kwargs)
+        IOU = compute_2d_based_iou(pred_kp[gt_cats == cl],
+                                   gt_kp[gt_cats == cl],)
         acc = compute_accuracy(pred_cats[gt_cats == cl],
                                gt_cats[gt_cats == cl],
                                **kwargs)
-        computed_metrics.append((cl, ADD, SADD, acc))
+        computed_metrics.append((cl, ADD, SADD, IOU, acc))
 
     return computed_metrics
 

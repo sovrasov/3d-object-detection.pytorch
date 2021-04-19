@@ -12,7 +12,7 @@ from torchdet3d.utils import draw_kp
 OBJECTRON_CLASSES = ('bike', 'book', 'bottle', 'cereal_box', 'camera', 'chair', 'cup', 'laptop', 'shoe')
 
 class Detector:
-    """Wrapper class for face detector"""
+    """Wrapper class for object detector"""
     def __init__(self, ie,  model_path, conf=.6, device='CPU', ext_path=''):
         self.net = load_ie_model(ie, model_path, device, None, ext_path)
         self.confidence = conf
@@ -25,9 +25,8 @@ class Detector:
     def wait_and_grab(self):
         outputs = self.net.grab_all_async()
         detections = []
-        for out in outputs:
-            detection = self.__decode_detections(out, self.frame_shape)
-            detections.append(detection)
+        assert len(outputs) == 1
+        detections = self.__decode_detections(outputs[0], self.frame_shape)
         return detections
 
     def get_detections(self, frame):
@@ -73,7 +72,7 @@ class Regressor:
     def get_detections(self, frame, detections):
         """Returns all detections on frame"""
         outputs = []
-        for rect in detections[0]:
+        for rect in detections:
             cropped_img = self.crop(frame, rect[0])
             out = self.net.forward(cropped_img)
             out = self.__decode_detections(out, rect)
@@ -106,7 +105,7 @@ class Regressor:
 
 def draw_detections(frame, reg_detections, det_detections, reg_only=True):
     """Draws detections and labels"""
-    for det_out, reg_out in zip(det_detections[0], reg_detections):
+    for det_out, reg_out in zip(det_detections, reg_detections):
         left, top, right, bottom = det_out[0]
         kp = reg_out[0]
         label = reg_out[1]
@@ -125,10 +124,11 @@ def draw_detections(frame, reg_detections, det_detections, reg_only=True):
 
 def run(params, capture, detector, regressor, write_video=False, resolution = (1280, 720)):
     """Starts the 3D object detection demo"""
-    fps = 24
-    fourcc = cv.VideoWriter_fourcc('M','J','P','G')
+    fps = 20
+    fourcc = cv.VideoWriter_fourcc(*'mpeg')
     if write_video:
-        writer_video = cv.VideoWriter('output_video_demo.mp4', fourcc, fps, resolution)
+        vout = cv.VideoWriter()
+        vout.open('output_video_demo.mp4',fourcc,fps,resolution,True)
     win_name = '3D-object-detection'
     has_frame, prev_frame = capture.read()
     prev_frame = cv.resize(prev_frame, resolution)
@@ -147,11 +147,12 @@ def run(params, capture, detector, regressor, write_video=False, resolution = (1
         vis = draw_detections(prev_frame, outputs, detections, reg_only=False)
         cv.imshow(win_name, vis)
         if write_video:
-            writer_video.write(vis)
+            vout.write(vis)
         prev_frame, frame = frame, prev_frame
 
     capture.release()
-    writer_video.release()
+    if write_video:
+        vout.release()
     cv.destroyAllWindows()
 
 def main():
