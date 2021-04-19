@@ -1,9 +1,9 @@
 import torch
 
-__AVAILABLE_OPTIMS = ['sgd', 'rmsprop', 'adam', 'adadelta']
+AVAILABLE_OPTIMS = ['sgd', 'rmsprop', 'adam', 'adadelta']
 
 def build_optimizer(cfg, net):
-    assert cfg.optim.name in __AVAILABLE_OPTIMS
+    assert cfg.optim.name in AVAILABLE_OPTIMS
     if cfg.optim.name == 'adadelta':
         optim = torch.optim.Adadelta(net.parameters(), lr=cfg.optim.lr, rho=cfg.optim.rho,
                                      weight_decay=cfg.optim.wd)

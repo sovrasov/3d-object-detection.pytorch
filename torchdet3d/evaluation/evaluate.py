@@ -100,7 +100,7 @@ class Evaluator:
             IOU = compute_2d_based_iou(pred_kp, gt_kp)
             acc = compute_accuracy(pred_cats, gt_cats)
 
-            for cl, ADD_cls, SADD_cls, acc_cls in compute_metrics_per_cls(pred_kp, gt_kp, gt_cats, pred_cats):
+            for cl, ADD_cls, SADD_cls, acc_cls in compute_metrics_per_cls(pred_kp, gt_kp, pred_cats, gt_cats):
                 ADD_cls_meter[cl].update(ADD_cls, imgs.size(0))
                 SADD_cls_meter[cl].update(SADD_cls, imgs.size(0))
                 acc_cls_meter[cl].update(acc_cls, imgs.size(0))

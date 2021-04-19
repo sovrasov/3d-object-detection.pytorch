@@ -113,15 +113,3 @@ class LossManager:
                 print(f"classification coefficient changed : {self.lam_cls}")
 
         return self.lam_reg * sum(regress_loss) + self.lam_cls * sum(class_loss)
-
-def test():
-    import torch.nn.functional as F
-    for loss in [WingLoss()]:
-        input_ = F.sigmoid(torch.randn(3, 9, 2, requires_grad=True))
-        target = F.sigmoid(torch.randn(3, 9, 2))
-        output = loss(input_, target)
-        ic(output)
-        output.backward()
-
-if __name__ == '__main__':
-    test()

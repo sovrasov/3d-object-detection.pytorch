@@ -1,7 +1,7 @@
 import torch
 from torchdet3d.losses import DiagLoss, ADD_loss, WingLoss
 
-__AVAILABLE_LOSS = ['smoothl1', 'cross_entropy', 'diag_loss', 'mse', 'add_loss', 'wing']
+AVAILABLE_LOSS = ['smoothl1', 'cross_entropy', 'diag_loss', 'mse', 'add_loss', 'wing']
 
 
 def build_loss(cfg):
@@ -9,7 +9,7 @@ def build_loss(cfg):
     regress_criterions = []
     class_criterions = []
     for loss_name in cfg.loss.names:
-        assert loss_name in __AVAILABLE_LOSS
+        assert loss_name in AVAILABLE_LOSS
         if loss_name == 'cross_entropy':
             class_criterions.append(torch.nn.CrossEntropyLoss())
         elif loss_name == 'smoothl1':
