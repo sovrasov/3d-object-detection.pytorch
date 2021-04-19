@@ -1,5 +1,5 @@
 albumentations
-attrdict
+addict
 opencv-python
 numpy
 sklearn
@@ -19,3 +19,4 @@ efficientnet_lite2_pytorch_model
 optuna
 pylint
 isort
+pytest

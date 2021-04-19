@@ -7,7 +7,7 @@ Training includes the following stages:
 - Training a 2d bounding box detection model
 - Training a 3d bounding box regression model
 
-Trained models can be deployed on CPU using [OpenVINO](https://docs.openvinotoolkit.org) framework and then run in [live demo]().
+Trained models can be deployed on CPU using [OpenVINO](https://docs.openvinotoolkit.org) framework and then run in [live demo](demo/demo.py).
 
 ## Installation guide
 ```bash

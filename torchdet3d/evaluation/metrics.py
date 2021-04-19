@@ -1,4 +1,12 @@
 import torch
+import scipy
+import numpy as np
+
+from objectron.dataset import iou
+from objectron.dataset import box
+
+from torchdet3d.utils import lift_2d
+
 
 def compute_average_distance(pred_kp, gt_kp, num_keypoint=9, **kwargs):
     """Computes Average Distance (ADD) metric."""
@@ -41,3 +49,21 @@ def compute_metrics_per_cls(pred_kp, gt_kp, gt_cats, pred_cats, **kwargs):
         computed_metrics.append((cl, ADD, SADD, acc))
 
     return computed_metrics
+
+def compute_2d_based_iou(pred_kp: torch.Tensor, gt_kp: torch.Tensor):
+    assert len(pred_kp.shape) == 3
+    bs = pred_kp.shape[0]
+    pred_kp_np = pred_kp.cpu().numpy()
+    gt_kp_np = gt_kp.cpu().numpy()
+    total_iou = 0
+    for i in range(bs):
+        kps_3d = lift_2d([pred_kp_np[i], gt_kp_np[i]], portrait=True)
+        b_pred = box.Box(vertices=kps_3d[0])
+        b_gt = box.Box(vertices=kps_3d[1])
+        try:
+            total_iou += iou.IoU(b_pred, b_gt).iou()
+        except scipy.spatial.qhull.QhullError:
+            pass
+        except np.linalg.LinAlgError:
+            pass
+    return total_iou / bs

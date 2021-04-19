@@ -13,7 +13,7 @@ import numpy as np
 import cv2 as cv
 import torch
 
-from attrdict import AttrDict as adict
+from addict import Dict as adict
 
 from objectron.dataset import graphics
 

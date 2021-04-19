@@ -177,7 +177,7 @@ def main():
                         help='MKLDNN (CPU)-targeted custom layers.Absolute path to a shared library with the kernels '
                              'impl.', type=str, default=None)
     parser.add_argument('--write_video', action='store_true',
-                        help='wether or not to record demo video')
+                        help='whether to save a demo video or not')
     args = parser.parse_args()
 
     if args.cam_id >= 0:
