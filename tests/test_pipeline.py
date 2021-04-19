@@ -22,7 +22,7 @@ class TestCasesPipeline:
         IOU = compute_2d_based_iou(self.test_kps, self.gt_kps)
         acc = compute_accuracy(self.test_cats, self.gt_cats)
         assert 0 <= ADD <= 1 and 0 <= SADD <= 1 and 0 <= IOU <= 1 and 0 <= acc <= 1
-        assert len(metrics) == 9 and len(metrics[0]) == 4
+        assert len(metrics) == 9 and len(metrics[0]) == 5
 
     def test_losses(self):
         for loss in [WingLoss(), ADD_loss(), DiagLoss()]:
