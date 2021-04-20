@@ -17,6 +17,8 @@ from addict import Dict as adict
 
 from objectron.dataset import graphics
 
+OBJECTRON_CLASSES = ('bike', 'book', 'bottle', 'cereal_box', 'camera', 'chair', 'cup', 'laptop', 'shoe')
+
 def set_random_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)

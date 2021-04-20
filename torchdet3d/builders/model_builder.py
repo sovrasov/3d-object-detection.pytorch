@@ -38,6 +38,8 @@ def build_model(config, export_mode=False):
 
         if config.model.pretrained and not export_mode:
             load_pretrained_weights(model, weights_path)
+        if config.model.load_weights:
+            load_pretrained_weights(model, config.model.load_weights)
 
     elif config.model.name == 'mobilenetv3_large':
         params = model_params['mobilenetv3_large']
@@ -45,6 +47,8 @@ def build_model(config, export_mode=False):
                                 num_classes=config.model.num_classes, export_mode=export_mode, **params)
         if config.model.pretrained and not export_mode:
             init_pretrained_weights(model, key='mobilenetv3_large')
+        if config.model.load_weights:
+            load_pretrained_weights(model, config.model.load_weights)
 
     elif config.model.name == 'mobilenetv3_small':
         params = model_params['mobilenetv3_small']
@@ -52,6 +56,8 @@ def build_model(config, export_mode=False):
                                 num_classes=config.model.num_classes, export_mode=export_mode, **params)
         if config.model.pretrained and not export_mode:
             init_pretrained_weights(model, key='mobilenetv3_small')
+        if config.model.load_weights:
+            load_pretrained_weights(model, config.model.load_weights)
 
     return model
 
@@ -60,8 +66,9 @@ def model_wraper(model_class, output_channels, num_points=18,
     class ModelWrapper(model_class):
         def __init__(self, output_channel=output_channels, **kwargs):
             super().__init__(**kwargs)
+            max_classes = 9
             self.regressors = nn.ModuleList()
-            for _ in range(num_classes):
+            for _ in range(max_classes):
                 self.regressors.append(self._init_regressors(output_channel))
             self.classifier = nn.Sequential(
                 nn.Dropout(0.5),
@@ -97,11 +104,11 @@ def model_wraper(model_class, output_channels, num_points=18,
             features = self.extract_features(x)
             pooled_features = self._glob_feature_vector(features, mode=pooling_mode)
             predicted_output = list()
-            if len(self.regressors) > 1:
-                for reg in self.regressors[1:]:
-                    predicted_output.append(reg(pooled_features).view(1, x.size(0), num_points // 2, 2))
+            for reg in self.regressors:
+                predicted_output.append(reg(pooled_features).view(1, x.size(0), num_points // 2, 2))
             predicted_output = self.sigmoid(torch.cat(predicted_output))
-
+            # predicted_targets = self.classifier(pooled_features) if num_classes > 1 else torch.zeros(x.size(0))
+            # return (predicted_output, predicted_targets)
             return predicted_output
 
         def forward(self, x, cats):

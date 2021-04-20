@@ -16,6 +16,7 @@ efficientnet_lite_pytorch
 efficientnet_lite0_pytorch_model
 efficientnet_lite1_pytorch_model
 efficientnet_lite2_pytorch_model
+optuna
 pylint
 isort
 pytest

@@ -18,6 +18,17 @@ class Detector:
         self.confidence = conf
         self.expand_ratio = (1., 1.)
 
+    def run_async(self, frame):
+        self.frame_shape = frame.shape
+        self.net.forward_async(frame)
+
+    def wait_and_grab(self):
+        outputs = self.net.grab_all_async()
+        detections = []
+        assert len(outputs) == 1
+        detections = self.__decode_detections(outputs[0], self.frame_shape)
+        return detections
+
     def get_detections(self, frame):
         """Returns all detections on frame"""
         out = self.net.forward(frame)
@@ -113,25 +124,35 @@ def draw_detections(frame, reg_detections, det_detections, reg_only=True):
 
 def run(params, capture, detector, regressor, write_video=False, resolution = (1280, 720)):
     """Starts the 3D object detection demo"""
-    fourcc = cv.VideoWriter_fourcc(*'MP4V')
-    fps = 24
+    fps = 20
+    fourcc = cv.VideoWriter_fourcc(*'mpeg')
     if write_video:
-        writer_video = cv.VideoWriter('output_video_demo.mp4', fourcc, fps, resolution)
+        vout = cv.VideoWriter()
+        vout.open('output_video_demo.mp4',fourcc,fps,resolution,True)
     win_name = '3D-object-detection'
+    has_frame, prev_frame = capture.read()
+    prev_frame = cv.resize(prev_frame, resolution)
+    if not has_frame:
+        return
+    detector.run_async(prev_frame)
     while cv.waitKey(1) != 27:
         has_frame, frame = capture.read()
-        frame = cv.resize(frame, resolution)
         if not has_frame:
             return
-        detections = detector.get_detections(frame)
-        outputs = regressor.get_detections(frame, detections)
+        frame = cv.resize(frame, resolution)
+        detections = detector.wait_and_grab()
+        detector.run_async(frame)
+        outputs = regressor.get_detections(prev_frame, detections)
 
-        frame = draw_detections(frame, outputs, detections, reg_only=False)
-        cv.imshow(win_name, frame)
+        vis = draw_detections(prev_frame, outputs, detections, reg_only=False)
+        cv.imshow(win_name, vis)
         if write_video:
-            writer_video.write(cv.resize(frame, resolution))
-            writer_video.release()
+            vout.write(vis)
+        prev_frame, frame = frame, prev_frame
+
     capture.release()
+    if write_video:
+        vout.release()
     cv.destroyAllWindows()
 
 def main():
@@ -145,13 +166,13 @@ def main():
                         help='Configuration file')
     parser.add_argument('--od_model', type=str, required=True)
     parser.add_argument('--reg_model', type=str, required=True)
-    parser.add_argument('--det_tresh', type=float, required=False, default=0.6)
+    parser.add_argument('--det_tresh', type=float, required=False, default=0.7)
     parser.add_argument('--device', type=str, default='CPU')
     parser.add_argument('-l', '--cpu_extension',
                         help='MKLDNN (CPU)-targeted custom layers.Absolute path to a shared library with the kernels '
                              'impl.', type=str, default=None)
-    parser.add_argument('--write_video', type=bool, default=False,
-                        help='if you set this arg to True, the video of the demo will be recoreded')
+    parser.add_argument('--write_video', action='store_true',
+                        help='whether to save a demo video or not')
     args = parser.parse_args()
 
     if args.cam_id >= 0:

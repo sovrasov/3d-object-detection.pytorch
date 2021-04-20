@@ -9,6 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torchdet3d.builders import (build_loader, build_model, build_loss,
                                     build_optimizer, build_scheduler)
 from torchdet3d.evaluation import Evaluator
+from torchdet3d.losses import LossManager
 from torchdet3d.trainer import Trainer
 from torchdet3d.utils import read_py_config, Logger, set_random_seed
 
@@ -36,6 +37,7 @@ def main():
 
     # init main components
     net = build_model(cfg)
+    # TO DO resume from chkpt opportunity
     net.to(args.device)
     if (torch.cuda.is_available() and args.device == 'cuda' and cfg.data_parallel.use_parallel):
         net = torch.nn.DataParallel(net, **cfg.data_parallel.parallel_params)
@@ -43,14 +45,14 @@ def main():
     criterions = build_loss(cfg)
     optimizer = build_optimizer(cfg, net)
     scheduler = build_scheduler(cfg, optimizer)
+    loss_manager = LossManager(criterions, cfg.loss.coeffs, cfg.loss.alwa)
     train_loader, val_loader, test_loader = build_loader(cfg)
     writer = SummaryWriter(cfg.output_dir)
 
     trainer = Trainer(model=net,
                       train_loader=train_loader,
                       optimizer=optimizer,
-                      criterions=criterions,
-                      losses_coeffs=cfg.loss.coeffs,
+                      loss_manager=loss_manager,
                       writer=writer,
                       max_epoch=cfg.data.max_epochs,
                       log_path=cfg.output_dir,

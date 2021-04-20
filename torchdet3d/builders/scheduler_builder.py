@@ -1,12 +1,12 @@
 import torch
 
-__AVAILABLE_SCHEDS = ['cosine', 'exp', 'stepLR', 'multistepLR']
+AVAILABLE_SCHEDS = ['cosine', 'exp', 'stepLR', 'multistepLR']
 
 def build_scheduler(cfg, optimizer):
     if cfg.scheduler.name is None:
         return None
 
-    assert cfg.scheduler.name in __AVAILABLE_SCHEDS
+    assert cfg.scheduler.name in AVAILABLE_SCHEDS
     if cfg.scheduler.name == 'cosine':
         sched = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,
                                                            T_max=cfg.data.max_epochs,

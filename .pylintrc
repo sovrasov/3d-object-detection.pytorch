@@ -29,7 +29,7 @@ disable = arguments-differ,
 max-line-length = 120
 ignore-docstrings = yes
 ignored-modules = numpy,torch,cv2,openvino
-extension-pkg-whitelist = torch,cv2
+extension-pkg-whitelist = torch,cv2,scipy
 
 [SIMILARITIES]
 ignore-imports = yes

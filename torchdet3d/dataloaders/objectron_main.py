@@ -9,8 +9,7 @@ import numpy as np
 from icecream import ic
 import albumentations as A
 
-from torchdet3d.utils import draw_kp, ToTensor, ConvertColor, unnormalize_img
-
+from torchdet3d.utils import draw_kp, ToTensor, ConvertColor, unnormalize_img, OBJECTRON_CLASSES
 
 class Objectron(Dataset):
     def __init__(self, root_folder, mode='train', transform=None, debug_mode=False, name='0', category_list='all'):
@@ -19,6 +18,8 @@ class Objectron(Dataset):
         self.transform = transform
         self.debug_mode = debug_mode
         self.mode = mode
+        self.num_classes = (len(category_list) if isinstance(category_list, list)
+                                                else len(OBJECTRON_CLASSES))
 
         if mode == 'train':
             ann_path = Path(root_folder).resolve() / 'annotations/objectron_train.json'
@@ -33,7 +34,8 @@ class Objectron(Dataset):
 
         # filter categories
         if category_list != 'all':
-            self.annotations = list(filter(lambda x: x['category_id'] in category_list, self.ann['annotations']))
+            self.annotations = list(filter(lambda x: OBJECTRON_CLASSES[x['category_id'] - 1] in
+                                                category_list, self.ann['annotations']))
             images_id = {ann_obj['image_id'] for ann_obj in self.annotations}
             # create dict since ordering now different
             self.images = {img_obj['id']: img_obj
@@ -50,7 +52,9 @@ class Objectron(Dataset):
         # get path to image from annotations
         raw_keypoints = self.annotations[indx]['keypoints']
         img_id = self.annotations[indx]['image_id']
-        category = int(self.annotations[indx]['category_id']) - 1
+        cat_id = int(self.annotations[indx]['category_id']) - 1
+        # in case when classes are not equal to 9 choose closest
+        category = min(range(self.num_classes), key=lambda x:abs(x-cat_id))
         # get raw key points for bb from annotations
         img_path = self.root_folder + '/' + (self.images[img_id]['file_name'])
         # read image
@@ -141,9 +145,7 @@ def test():
     "Perform dataloader test"
     def super_vision_test(root, mode='val', transform=None, index=7):
         ds = Objectron(root, mode=mode, transform=transform, debug_mode=True, name=str(index))
-        print(len(ds))
-        ds = Objectron(root, mode=mode, transform=transform, debug_mode=True, name=str(index), category_list=[1])
-        print(len(ds))
+        ic(len(ds))
         _, bbox, _ = ds[index]
         assert bbox.shape == (9,2)
 
@@ -159,7 +161,19 @@ def test():
         assert img_tensor.shape == (batch_size, 3, 290, 290)
         assert bbox.shape == (batch_size, 9, 2)
 
-    root = './data_cereal_box'
+    def cat_filter_test(root, mode='val', transform=None, category_list=['book']):
+        ds = Objectron(root, mode=mode, transform=transform, category_list=category_list)
+        dataloader = DataLoader(ds, batch_size=128, shuffle=True)
+        ic(len(dataloader))
+        def in_func(cat):
+            assert OBJECTRON_CLASSES[cat] in category_list
+        for i, (_, _, category) in enumerate(dataloader):
+            ic(i)
+            if i == len(dataloader) // 10:
+                break
+            map(in_func, category)
+
+    root = './data'
     normalization = A.augmentations.transforms.Normalize(**dict(mean=[0.5931, 0.4690, 0.4229],
                                                             std=[0.2471, 0.2214, 0.2157]))
     transform = A.Compose([ ConvertColor(),
@@ -171,10 +185,11 @@ def test():
                             normalization,
                             ToTensor((290, 290)),
                           ],keypoint_params=A.KeypointParams(format='xy'))
-    for index in np.random.randint(0,60000,1):
-        super_vision_test(root, mode='train', transform=transform, index=index)
+    for index in np.random.randint(0,10000,20):
+        super_vision_test(root, mode='val', transform=transform, index=index)
     dataset_test(root, mode='val', transform=transform, batch_size=256)
     dataset_test(root, mode='train', transform=transform, batch_size=256)
+    cat_filter_test(root, mode='val', transform=transform, category_list=['shoe', 'camera', 'bottle', 'bike'])
 
 if __name__ == '__main__':
     test()

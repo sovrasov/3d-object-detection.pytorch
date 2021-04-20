@@ -54,11 +54,6 @@ def load_ie_model(ie, model_xml, device, plugin_dir, cpu_extension='', num_reqs=
     log.info("Loading network")
     net = ie.read_network(model_xml, os.path.splitext(model_xml)[0] + ".bin")
 
-    assert len(net.input_info) in [1, 2], \
-        "Supports topologies with only 1 or 2 inputs"
-    assert len(net.outputs) in [1, 2, 4, 5], \
-        "Supports topologies with only 1, 2, 4 or 5 outputs"
-
     log.info("Preparing input blobs")
     input_blob = next(iter(net.input_info))
     out_blob = next(iter(net.outputs))

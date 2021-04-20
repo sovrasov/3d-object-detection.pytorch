@@ -1,10 +1,9 @@
 import math
 
 import torch
-from icecream import ic
 from torch.nn.modules.loss import _Loss
 
-__all__ = ['DiagLoss', 'ADD_loss', 'WingLoss']
+__all__ = ['DiagLoss', 'ADD_loss', 'WingLoss', 'LossManager']
 
 class DiagLoss(_Loss):
     __constants__ = ['reduction']
@@ -37,8 +36,8 @@ class WingLoss(_Loss):
         loss = torch.abs(input_ - target)
         loss[loss < self.w] = self.wing_core(loss[loss < self.w], self.w, self.eps)
         loss[loss >= self.w] -= wing_const
-        diag_dist = compute_diag(target)
-        loss /= diag_dist.view(input_.size(0),1,1)
+        # diag_dist = compute_diag(target)
+        # loss /= diag_dist.view(input_.size(0),1,1)
 
         return torch.mean(loss)
 
@@ -58,14 +57,59 @@ def compute_diag(input_: torch.Tensor):
 
     return diag
 
-def test():
-    import torch.nn.functional as F
-    for loss in [WingLoss()]:
-        input_ = F.sigmoid(torch.randn(3, 9, 2, requires_grad=True))
-        target = F.sigmoid(torch.randn(3, 9, 2))
-        output = loss(input_, target)
-        ic(output)
-        output.backward()
+class LossManager:
+    def __init__(self, criterions, coefficients, alwa):
+        self.reg_criterions, self.class_criterions = criterions
+        self.reg_coeffs, self.class_coeffs = coefficients
+        assert len(self.reg_coeffs) == len(self.reg_criterions)
+        assert len(self.class_coeffs) == len(self.class_criterions)
+        assert self.reg_criterions
+        self.use_alwa = alwa.use
+        if alwa.use:
+            assert self.class_criterions
+            assert self.reg_coeffs[0] == self.class_coeffs[0] == 1.
+        # init lambdas for alwa algorithm
+        self.lam_cls = alwa.lam_cls
+        self.lam_reg = alwa.lam_reg
+        self.s_cls = list()
+        self.s_reg = list()
+        self.C = alwa.C
+        self.alwa_version = 'ver_1' if alwa.compute_std else 'ver_2'
 
-if __name__ == '__main__':
-    test()
+    def parse_losses(self, pred_kp, gt_kp,
+                        pred_cats, gt_cats, iter_):
+        class_loss = []
+        regress_loss = []
+        # compute losses
+        if self.class_criterions:
+            for k, cr in zip(self.class_coeffs, self.class_criterions):
+                class_loss.append(cr(pred_cats, gt_cats) * k)
+        else:
+            class_loss = torch.zeros(1, requires_grad=True)
+        for k, cr in zip(self.reg_coeffs, self.reg_criterions):
+            regress_loss.append(cr(pred_kp, gt_kp) * k)
+        reg_loss = sum(regress_loss)
+        cls_loss = sum(class_loss)
+        # compute alwa algo or just return sum of losses
+        if not self.use_alwa:
+            return sum(regress_loss) + sum(class_loss)
+        self.s_cls.append(self.lam_cls*cls_loss)
+        self.s_reg.append(self.lam_reg*reg_loss)
+        if iter_ % self.C == 0 and iter_ != 0:
+            cls_mean = torch.mean(torch.stack(self.s_cls))
+            cls_std = torch.std(torch.stack(self.s_cls))
+            reg_mean = torch.mean(torch.stack(self.s_reg))
+            reg_std = torch.std(torch.stack(self.s_reg))
+            self.s_cls.clear()
+            self.s_reg.clear()
+            if self.alwa_version == 'ver_1':
+                cls = cls_mean + cls_std
+                reg = reg_mean + reg_std
+            else:
+                cls = cls_mean
+                reg = reg_mean
+            if cls > reg:
+                self.lam_cls = (1 - (cls - reg)/cls).item()
+                print(f"classification coefficient changed : {self.lam_cls}")
+
+        return self.lam_reg * sum(regress_loss) + self.lam_cls * sum(class_loss)

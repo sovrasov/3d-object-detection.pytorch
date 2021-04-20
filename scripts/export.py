@@ -50,7 +50,7 @@ def main():
                              'By default the model will be obtained from config, the lastest epoch')
     parser.add_argument('--model_mo_path', type=str, default='./converted_models', required=False,
                         help='path where to save the model in IR format')
-    parser.add_argument('--convert_mo', type=bool, default=True, required=False,
+    parser.add_argument('--convert_mo', action='store_true',
                         help='argument defines whether or not to convert to IR format')
 
     args = parser.parse_args()
