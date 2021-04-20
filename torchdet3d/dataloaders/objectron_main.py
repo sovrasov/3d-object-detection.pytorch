@@ -18,7 +18,8 @@ class Objectron(Dataset):
         self.transform = transform
         self.debug_mode = debug_mode
         self.mode = mode
-        self.num_classes = len(category_list)
+        self.num_classes = (len(category_list) if isinstance(category_list, list)
+                                                else len(OBJECTRON_CLASSES))
 
         if mode == 'train':
             ann_path = Path(root_folder).resolve() / 'annotations/objectron_train.json'

@@ -27,17 +27,19 @@ def objective(cfg, args, trial):
     if (torch.cuda.is_available() and args.device == 'cuda' and cfg.data_parallel.use_parallel):
         model = torch.nn.DataParallel(model, **cfg.data_parallel.parallel_params)
     # Generate the trials.
-    steps = trial.suggest_categorical("steps", [[40,60,90], [50,70,90], [60,75,90], [70,80,90], [30], [50], [70]])
-    epoch = trial.suggest_int("epochs", 100, 300)
+    steps = trial.suggest_categorical("steps", ['40/60/90', '50/70/90', '60/75/90', '70/80/90', '30', '50', '70'])
+    epoch = trial.suggest_int("epochs", 100, 250)
     gamma = trial.suggest_categorical("gamma", [i/10 for i in range(1,7)])
-    if len(steps) == 3:
+    if len(steps) > 2:
         cfg['scheduler']['name'] = 'multistepLR'
+        cfg['scheduler']['steps'] = [ int(int(i)/100 * epoch) for i in steps.split('/')]
     else:
         cfg['scheduler']['name'] = 'stepLR'
-    cfg['scheduler']['steps'] = steps
+        cfg['scheduler']['steps'] = [int(steps)]
+
     cfg['scheduler']['gamma'] = gamma
     args.epochs = epoch
-    print(f"\nnext trial with [steps: {steps}, epochs: {epoch}, gamma: {gamma}]")
+    print(f"\nnext trial with [steps: {cfg.scheduler.steps}, epochs: {epoch}, gamma: {gamma}]")
 
     optimizer = build_optimizer(cfg, model)
     scheduler = build_scheduler(cfg, optimizer)
@@ -161,6 +163,7 @@ def main():
         log_name = 'optuna.log'
         log_name += time.strftime('-%Y-%m-%d-%H-%M-%S')
         sys.stdout = Logger(osp.join(cfg.output_dir, log_name))
+    print(cfg.utils.random_seeds)
     set_random_seed(cfg.utils.random_seeds)
 
     study = optuna.create_study(study_name='regression task', direction="minimize")
