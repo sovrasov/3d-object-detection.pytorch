@@ -168,28 +168,36 @@ def test():
         def in_func(cat):
             assert OBJECTRON_CLASSES[cat] in category_list
         for i, (_, _, category) in enumerate(dataloader):
-            ic(i)
             if i == len(dataloader) // 10:
                 break
             map(in_func, category)
 
     root = './data'
-    normalization = A.augmentations.transforms.Normalize(**dict(mean=[0.5931, 0.4690, 0.4229],
-                                                            std=[0.2471, 0.2214, 0.2157]))
-    transform = A.Compose([ ConvertColor(),
-                            A.Resize(290, 290),
-                            A.RandomBrightnessContrast(p=0.2),
-                            A.HorizontalFlip(p=0.5),
-                            A.augmentations.transforms.ISONoise(color_shift=(0.15,0.35),
-                                                                intensity=(0.2, 0.5), p=0.2),
-                            normalization,
-                            ToTensor((290, 290)),
-                          ],keypoint_params=A.KeypointParams(format='xy'))
-    for index in np.random.randint(0,10000,20):
-        super_vision_test(root, mode='val', transform=transform, index=index)
-    dataset_test(root, mode='val', transform=transform, batch_size=256)
-    dataset_test(root, mode='train', transform=transform, batch_size=256)
-    cat_filter_test(root, mode='val', transform=transform, category_list=['shoe', 'camera', 'bottle', 'bike'])
+    normalize = A.augmentations.transforms.Normalize (**dict(mean=[0.5931, 0.4690, 0.4229],
+                                                             std=[0.2471, 0.2214, 0.2157]))
+    train_transform = A.Compose([
+                        ConvertColor(),
+                        A.Resize(*(224,224)),
+                        A.HorizontalFlip(p=0.3),
+                        # A.Rotate(limit=30, p=0.3),
+                        A.OneOf([
+                                    A.HueSaturationValue(p=0.3),
+                                    A.RGBShift(p=0.3),
+                                    A.RandomBrightnessContrast(p=0.3),
+                                    A.CLAHE(p=0.3),
+                                    A.ColorJitter(p=0.3),
+                                ], p=1),
+                        A.Blur(blur_limit=5, p=0.3),
+                        A.Posterize(p=0.3),
+                        A.IAAPiecewiseAffine(p=1.),
+                        normalize,
+                        ToTensor((224,224))
+                        ], keypoint_params=A.KeypointParams(format='xy', remove_invisible=False))
+    for index in np.random.randint(0,60000,20):
+        super_vision_test(root, mode='val', transform=train_transform, index=index)
+    dataset_test(root, mode='val', transform=train_transform, batch_size=256)
+    dataset_test(root, mode='train', transform=train_transform, batch_size=256)
+    cat_filter_test(root, mode='val', transform=train_transform, category_list=['shoe', 'camera', 'bottle', 'bike'])
 
 if __name__ == '__main__':
     test()

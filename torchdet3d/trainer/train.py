@@ -106,7 +106,6 @@ class Trainer:
             if (self.debug and it == self.debug_steps):
                 break
 
-        # save every 10 epoch
         if self.save_chkpt and epoch % self.save_freq == 0 and not self.debug:
             save_snap(self.model, self.optimizer, epoch, self.log_path)
 
