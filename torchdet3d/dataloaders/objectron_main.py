@@ -179,7 +179,6 @@ def test():
                         ConvertColor(),
                         A.Resize(*(224,224)),
                         A.HorizontalFlip(p=0.3),
-                        # A.Rotate(limit=30, p=0.3),
                         A.OneOf([
                                     A.HueSaturationValue(p=0.3),
                                     A.RGBShift(p=0.3),
@@ -189,7 +188,7 @@ def test():
                                 ], p=1),
                         A.Blur(blur_limit=5, p=0.3),
                         A.Posterize(p=0.3),
-                        A.IAAPiecewiseAffine(p=1.),
+                        A.IAAPiecewiseAffine(p=0.3),
                         normalize,
                         ToTensor((224,224))
                         ], keypoint_params=A.KeypointParams(format='xy', remove_invisible=False))

@@ -78,7 +78,7 @@ def model_wraper(model_class, output_channels, num_points=18,
             self.sigmoid = nn.Sigmoid()
 
         @staticmethod
-        def _init_regressors(output_channel, intermediate_channels):
+        def _init_regressors(output_channel):
             return nn.Linear(output_channel, num_points)
 
         @staticmethod

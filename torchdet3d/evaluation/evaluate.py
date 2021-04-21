@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from dataclasses import dataclass
+from prettytable import PrettyTable
 from tqdm import tqdm
 from copy import deepcopy
 
@@ -114,34 +115,32 @@ class Evaluator:
             if self.debug and it == self.debug_steps:
                 break
 
-        per_class_metr_message = ''
         if epoch is not None:
             # write to writer for tensorboard
             self.writer.add_scalar('Val/ADD', ADD_meter.avg, global_step=self.val_step)
             self.writer.add_scalar('Val/SADD', SADD_meter.avg, global_step=self.val_step)
             self.writer.add_scalar('Val/ACC', ACC_meter.avg, global_step=self.val_step)
             self.writer.add_scalar('Val/IOU', IOU_meter.avg, global_step=self.val_step)
+            self.val_step += 1
+        t = PrettyTable(['category name', 'ADD', 'SADD', 'IOU', 'accuracy'], float_format=".4")
+        t.add_row(["Average metrics",
+                    ADD_meter.avg,
+                    SADD_meter.avg,
+                    IOU_meter.avg,
+                    ACC_meter.avg])
+
         for cls_ in range(self.num_classes):
             cl_str = OBJECTRON_CLASSES[cls_]
-            if epoch is not None:
-                self.writer.add_scalar(f'Val/ADD_{cl_str}', ADD_cls_meter[cls_].avg, global_step=self.val_step)
-                self.writer.add_scalar(f'Val/SADD_{cl_str}', SADD_cls_meter[cls_].avg, global_step=self.val_step)
-                self.writer.add_scalar(f'Val/ACC_{cl_str}', ACC_cls_meter[cls_].avg, global_step=self.val_step)
-                self.writer.add_scalar(f'Val/IOU_{cl_str}', IOU_cls_meter[cls_].avg, global_step=self.val_step)
-                self.val_step += 1
-            per_class_metr_message += (f"\n***{cl_str}***:\nADD: {ADD_cls_meter[cls_].avg}\n"
-                                      f"SADD: {SADD_cls_meter[cls_].avg}\n"
-                                      f"IOU: {IOU_cls_meter[cls_].avg}\n"
-                                      f"accuracy: {ACC_cls_meter[cls_].avg}\n")
+            t.add_row([cl_str,
+                       ADD_cls_meter[cls_].avg,
+                       SADD_cls_meter[cls_].avg,
+                       IOU_cls_meter[cls_].avg,
+                       ACC_cls_meter[cls_].avg])
 
-        ep_mess = f"epoch : {epoch}\n" if epoch is not None else ""
+        ep_mess = f"epoch: {epoch}\n" if epoch is not None else ""
         print("\nComputed val metrics:\n"
               f"{ep_mess}"
-              f"ADD overall ---> {ADD_meter.avg}\n"
-              f"SADD overall ---> {SADD_meter.avg}\n"
-              f"IOU ---> {IOU_meter.avg}\n"
-              f"classification accuracy overall ---> {ACC_meter.avg}\n"
-              f"{per_class_metr_message}")
+              f"{t}")
 
     def run_eval_pipe(self, visual_only=False):
         print('.'*10,'Run evaluating protocol', '.'*10)
