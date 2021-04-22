@@ -48,7 +48,7 @@ def build_augmentations(cfg):
                                         A.ColorJitter(p=0.3),
                                     ], p=1),
                             A.Blur(blur_limit=5, p=0.3),
-                            A.IAAPiecewiseAffine(p=0.3),
+                            # A.IAAPiecewiseAffine(p=0.3),
                             normalize,
                             ToTensor(cfg.data.resize)
                             ], keypoint_params=A.KeypointParams(format='xy', remove_invisible=False))
