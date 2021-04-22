@@ -20,3 +20,4 @@ optuna
 pylint
 isort
 pytest
+ptflops
