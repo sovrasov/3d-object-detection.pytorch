@@ -5,10 +5,8 @@ import glog as log
 import numpy as np
 from openvino.inference_engine import IECore
 
-from torchdet3d.utils import draw_kp, Regressor, Detector
+from torchdet3d.utils import draw_kp, Regressor, Detector, OBJECTRON_CLASSES
 
-
-OBJECTRON_CLASSES = ('bike', 'book', 'bottle', 'cereal_box', 'camera', 'chair', 'cup', 'laptop', 'shoe')
 
 def draw_detections(frame, reg_detections, det_detections, reg_only=True):
     """Draws detections and labels"""
