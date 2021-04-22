@@ -13,6 +13,7 @@ def main():
 
     cfg = read_py_config(args.config)
     model = build_model(cfg, export_mode=True)
+    model.eval()
     macs, params = get_model_complexity_info(model, (3, *cfg.data.resize),
                                              verbose=False, print_per_layer_stat=True)
     print(f'{"Input shape: ":<30}  {str((1, 3, *cfg.data.resize)):<8}')
