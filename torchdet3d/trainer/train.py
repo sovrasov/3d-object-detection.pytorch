@@ -14,7 +14,7 @@ class Trainer:
     optimizer: object
     loss_manager: object
     writer: object
-    max_epoch : float
+    max_epoch : int
     log_path : str
     device : str ='cuda'
     save_chkpt: bool = True
@@ -36,15 +36,9 @@ class Trainer:
         # switch to train mode and train one epoch
         self.model.train()
         self.num_iters = len(self.train_loader)
-        end = time.time()
+        start = time.time()
         loop = tqdm(enumerate(self.train_loader), total=self.num_iters, leave=False)
         for it, (imgs, gt_kp, gt_cats) in loop:
-            # compute eta
-            batch_time.update(time.time() - end)
-            nb_this_epoch = self.num_iters - (it + 1)
-            nb_future_epochs = (self.max_epoch - (epoch + 1)) * self.num_iters
-            eta_seconds = batch_time.avg * (nb_this_epoch+nb_future_epochs)
-            eta_str = str(datetime.timedelta(seconds=int(eta_seconds)))
             # put image and keypoints on the appropriate device
             imgs, gt_kp, gt_cats = self.put_on_device([imgs, gt_kp, gt_cats], self.device)
             # compute output and loss
@@ -79,6 +73,12 @@ class Trainer:
                              acc=acc,
                              acc_avg = ACC_meter.avg,
                              lr=self.optimizer.param_groups[0]['lr'])
+            # compute eta
+            batch_time.update(time.time() - start)
+            nb_this_epoch = self.num_iters - (it + 1)
+            nb_future_epochs = (self.max_epoch - (epoch + 1)) * self.num_iters
+            eta_seconds = batch_time.avg * (nb_this_epoch+nb_future_epochs)
+            eta_str = str(datetime.timedelta(seconds=int(eta_seconds)))
             if ((it % self.print_freq == 0) or (it == self.num_iters-1)):
                 print(
                         'epoch: [{0}/{1}][{2}/{3}]\t'
@@ -102,7 +102,7 @@ class Trainer:
                             lr=self.optimizer.param_groups[0]['lr'])
                         )
 
-            end = time.time()
+            start = time.time()
             if (self.debug and it == self.debug_steps):
                 break
 
