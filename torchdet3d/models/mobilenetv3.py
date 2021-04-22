@@ -1,6 +1,5 @@
 import math
 
-import torch
 import torch.nn as nn
 
 from  torchdet3d.utils import load_pretrained_weights
@@ -224,9 +223,7 @@ def init_pretrained_weights(model, key=''):
     Layers that don't match with pretrained layers in name or size are kept unchanged.
     """
     import os
-    import sys
     import errno
-    import inspect
     import gdown
 
     def _get_torch_home():

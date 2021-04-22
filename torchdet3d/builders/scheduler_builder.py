@@ -21,5 +21,6 @@ def build_scheduler(cfg, optimizer):
     if cfg.scheduler.name == 'multistepLR':
         sched = torch.optim.lr_scheduler.MultiStepLR(optimizer,
                                                      milestones=cfg.scheduler.steps,
-                                                     gamma=cfg.scheduler.gamma)
+                                                     gamma=cfg.scheduler.gamma,
+                                                     last_epoch=80)
     return sched

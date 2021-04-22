@@ -1,7 +1,4 @@
-import argparse
-
 import torch
-from icecream import ic
 import torch.nn as nn
 import torch.nn.functional as F
 from efficientnet_lite_pytorch import EfficientNet
@@ -24,7 +21,7 @@ EFFICIENT_NET_WEIGHTS = {
                          'efficientnet-lite2' : EfficientnetLite2ModelFile.get_model_file_path()
                          }
 
-def build_model(config, export_mode=False):
+def build_model(config, export_mode=False, weights_path=''):
     assert config.model.name in __AVAI_MODELS__, f"Wrong model name parameter. Expected one of {__AVAI_MODELS__}"
 
     if config.model.name.startswith('efficientnet'):
@@ -36,28 +33,30 @@ def build_model(config, export_mode=False):
                              blocks_args=blocks_args,
                              global_params=global_params)
 
-        if config.model.pretrained and not export_mode:
-            load_pretrained_weights(model, weights_path)
         if config.model.load_weights:
             load_pretrained_weights(model, config.model.load_weights)
+        elif config.model.pretrained and not export_mode:
+            load_pretrained_weights(model, weights_path)
 
     elif config.model.name == 'mobilenetv3_large':
         params = model_params['mobilenetv3_large']
         model = model_wraper(model_class=MobileNetV3, output_channels=1280,
                                 num_classes=config.model.num_classes, export_mode=export_mode, **params)
-        if config.model.pretrained and not export_mode:
-            init_pretrained_weights(model, key='mobilenetv3_large')
+
         if config.model.load_weights:
             load_pretrained_weights(model, config.model.load_weights)
+        elif config.model.pretrained and not export_mode:
+            init_pretrained_weights(model, key='mobilenetv3_large')
 
     elif config.model.name == 'mobilenetv3_small':
         params = model_params['mobilenetv3_small']
         model = model_wraper(model_class=MobileNetV3, output_channels=1024,
                                 num_classes=config.model.num_classes, export_mode=export_mode, **params)
-        if config.model.pretrained and not export_mode:
-            init_pretrained_weights(model, key='mobilenetv3_small')
+
         if config.model.load_weights:
             load_pretrained_weights(model, config.model.load_weights)
+        elif config.model.pretrained and not export_mode:
+            init_pretrained_weights(model, key='mobilenetv3_small')
 
     return model
 
@@ -128,18 +127,3 @@ def model_wraper(model_class, output_channels, num_points=18,
     if export_mode:
         model.forward = model.forward_to_onnx
     return model
-
-def test(config):
-    model = build_model(config)
-    img = torch.rand(128,3,224,224)
-    cats = torch.randint(0,5,(128,))
-    out = model(img, cats)
-    ic(out[0].shape, out[1].shape)
-
-if __name__ == "__main__":
-    from torchdet3d.utils import read_py_config
-    parser = argparse.ArgumentParser(description='3D-object-detection training')
-    parser.add_argument('--config', type=str, default='./configs/debug_config.py', help='path to config')
-    args = parser.parse_args()
-    cfg = read_py_config(args.config)
-    test(cfg)

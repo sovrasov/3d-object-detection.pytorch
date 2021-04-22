@@ -12,6 +12,7 @@ class Trainer:
     model: object
     train_loader: object
     optimizer: object
+    scheduler: object
     loss_manager: object
     writer: object
     max_epoch : int
@@ -107,7 +108,10 @@ class Trainer:
                 break
 
         if self.save_chkpt and epoch % self.save_freq == 0 and not self.debug:
-            save_snap(self.model, self.optimizer, epoch, self.log_path)
+            save_snap(self.model, self.optimizer, self.scheduler, epoch, self.log_path)
+        # do scheduler step
+        if self.scheduler is not None:
+            self.scheduler.step()
 
     @staticmethod
     def put_on_device(items, device):
