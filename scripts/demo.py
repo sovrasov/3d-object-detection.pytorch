@@ -66,8 +66,6 @@ def main():
     parser.add_argument('--video', type=str, default=None, help='Input video')
     parser.add_argument('--cam_id', type=int, default=-1, help='Input cam')
     parser.add_argument('--resolution', type=int, nargs='+', help='capture resolution')
-    parser.add_argument('--config', type=str, default=None, required=False,
-                        help='Configuration file')
     parser.add_argument('--od_model', type=str, required=True)
     parser.add_argument('--reg_model', type=str, required=True)
     parser.add_argument('--det_tresh', type=float, required=False, default=0.7)
