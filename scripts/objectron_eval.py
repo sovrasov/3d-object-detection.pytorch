@@ -10,7 +10,6 @@ Example:
 """
 
 import os
-import sys
 
 from absl import app
 from absl import flags
@@ -23,13 +22,15 @@ import cv2 as cv
 
 from openvino.inference_engine import IECore
 
-from torchdet3d.builders import build_model
-from torchdet3d.utils import (read_py_config, Detector, Regressor,
+from torchdet3d.utils import (Detector, Regressor,
                               OBJECTRON_CLASSES, draw_kp, lift_2d)
 
-from objectron.dataset.eval import Evaluator
-from objectron.dataset.eval import FLAGS
+from objectron.dataset.eval import (Evaluator, FLAGS, _MAX_PIXEL_ERROR,
+                                    _MAX_AZIMUTH_ERROR, _MAX_POLAR_ERROR, _MAX_DISTANCE)
 import objectron.dataset.metrics as metrics
+
+
+#pylint: disable = W0612, E1101
 
 
 def draw_detections(frame, reg_detections, det_detections, reg_only=True):
@@ -205,7 +206,6 @@ def main(argv):
     evaluator = Torchdet3dEvaluator(
         object_detector, regression_model, correct_class_index)
 
-    i = 0
     ds = tf.data.TFRecordDataset(
         glob.glob(FLAGS.eval_data)).take(FLAGS.max_num)
     batch = []
@@ -214,9 +214,6 @@ def main(argv):
         if len(batch) == FLAGS.batch_size:
             evaluator.evaluate(batch)
             batch.clear()
-        i += 1
-        if i > 4:
-            break
 
     if batch:
         evaluator.evaluate(batch)

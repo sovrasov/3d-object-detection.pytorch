@@ -2,7 +2,6 @@ import argparse
 
 import cv2 as cv
 import glog as log
-import numpy as np
 from openvino.inference_engine import IECore
 
 from torchdet3d.utils import draw_kp, Regressor, Detector, OBJECTRON_CLASSES
@@ -90,7 +89,6 @@ def main():
         assert args.video, "No video input was given"
         log.info('Reading from {}'.format(args.video))
         cap = cv.VideoCapture(args.video)
-        cap.set(cv.CAP_PROP_FOURCC, cv.VideoWriter_fourcc(*'MJPG'))
     assert cap.isOpened()
     ie = IECore()
     object_detector = Detector(ie, args.od_model, args.det_tresh, args.device, args.cpu_extension)
