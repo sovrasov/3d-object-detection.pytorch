@@ -80,7 +80,7 @@ class Torchdet3dEvaluator(Evaluator):
             a tuple of (point_2d, point_3d) that includes the predicted 2D and 3D vertices.
         """
         all_boxes = []
-        images *= 255
+        images = ((images + 1) * 127.5).astype(np.uint8)
         for i in range(batch_size):
             self.detection_model.run_async(images[i])
             detections = self.detection_model.wait_and_grab()
@@ -88,6 +88,8 @@ class Torchdet3dEvaluator(Evaluator):
                 images[i], detections)
             # vis = draw_detections(images[i], outputs, detections, reg_only=False)
             # cv.imwrite('eval.png', vis)
+            # cv.imshow('eval.png', vis)
+            # cv.waitKey()
             boxes = []
             for kps, label in outputs:
                 kps[:, 0] /= images[i].shape[1]
