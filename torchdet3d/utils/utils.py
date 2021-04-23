@@ -176,12 +176,11 @@ def load_pretrained_weights(model, file_path='', pretrained_dict=None):
         _print_loading_weights_inconsistencies(discarded_layers, unmatched_layers)
 
         raise RuntimeError(f'The pretrained weights {message} cannot be loaded')
-    else:
-        print(
-            'Successfully loaded pretrained weights from "{}"'.
-            format(message)
-        )
-        _print_loading_weights_inconsistencies(discarded_layers, unmatched_layers)
+    print(
+        'Successfully loaded pretrained weights from "{}"'.
+        format(message)
+    )
+    _print_loading_weights_inconsistencies(discarded_layers, unmatched_layers)
 
 def resume_from(model, chkpt_path, optimizer=None, scheduler=None):
     print(f'Loading checkpoint from "{chkpt_path}"')

@@ -46,6 +46,8 @@ def main():
     if cfg.model.resume:
         if check_isfile(cfg.model.resume):
             start_epoch = resume_from(net, cfg.model.resume, optimizer=optimizer, scheduler=None)
+        else:
+            raise RuntimeError("the checkpoint isn't found ot can't be loaded!")
     else:
         start_epoch = 0
 
