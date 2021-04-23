@@ -41,6 +41,8 @@ def main():
     net.to(args.device)
 
     optimizer = build_optimizer(cfg, net)
+    scheduler = build_scheduler(cfg, optimizer)
+
     if cfg.model.resume:
         if check_isfile(cfg.model.resume):
             start_epoch = resume_from(net, cfg.model.resume, optimizer=optimizer, scheduler=None)
@@ -48,7 +50,7 @@ def main():
             raise RuntimeError("checkpoint isn't found or can't be loaded!")
     else:
         start_epoch = 0
-    scheduler = build_scheduler(cfg, optimizer)
+
     if (torch.cuda.is_available() and args.device == 'cuda' and cfg.data_parallel.use_parallel):
         net = torch.nn.DataParallel(net, **cfg.data_parallel.parallel_params)
     criterions = build_loss(cfg)
@@ -91,7 +93,7 @@ def main():
         assert cfg.regime.type == "training"
         if cfg.model.resume:
             evaluator.val()
-        for epoch in range(cfg.data.max_epochs):
+        for epoch in range(start_epoch, cfg.data.max_epochs):
             trainer.train(epoch)
             evaluator.val(epoch)
         evaluator.visual_test()

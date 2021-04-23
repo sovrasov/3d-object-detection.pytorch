@@ -7,6 +7,7 @@ from efficientnet_lite0_pytorch_model import EfficientnetLite0ModelFile
 from efficientnet_lite1_pytorch_model import EfficientnetLite1ModelFile
 from efficientnet_lite2_pytorch_model import EfficientnetLite2ModelFile
 
+from icecream import ic
 from torchdet3d.models import MobileNetV3, init_pretrained_weights, model_params
 from torchdet3d.utils import load_pretrained_weights
 
@@ -29,6 +30,7 @@ def build_model(config, export_mode=False, weights_path=''):
         blocks_args, global_params = get_model_params(config.model.name, override_params=None)
         model = model_wraper(model_class=EfficientNet,
                              output_channels=1280,
+                             intermediate_channels=640,
                              num_classes=config.model.num_classes,
                              blocks_args=blocks_args,
                              global_params=global_params)
@@ -40,7 +42,7 @@ def build_model(config, export_mode=False, weights_path=''):
 
     elif config.model.name == 'mobilenetv3_large':
         params = model_params['mobilenetv3_large']
-        model = model_wraper(model_class=MobileNetV3, output_channels=1280,
+        model = model_wraper(model_class=MobileNetV3, output_channels=1280, intermediate_channels=640,
                                 num_classes=config.model.num_classes, export_mode=export_mode, **params)
 
         if config.model.load_weights:
@@ -50,7 +52,7 @@ def build_model(config, export_mode=False, weights_path=''):
 
     elif config.model.name == 'mobilenetv3_small':
         params = model_params['mobilenetv3_small']
-        model = model_wraper(model_class=MobileNetV3, output_channels=1024,
+        model = model_wraper(model_class=MobileNetV3, output_channels=1024, intermediate_channels=640,
                                 num_classes=config.model.num_classes, export_mode=export_mode, **params)
 
         if config.model.load_weights:
@@ -60,7 +62,7 @@ def build_model(config, export_mode=False, weights_path=''):
 
     return model
 
-def model_wraper(model_class, output_channels, num_points=18,
+def model_wraper(model_class, output_channels, intermediate_channels, num_points=18,
                     num_classes=1, pooling_mode='avg', export_mode=False, **kwargs):
     class ModelWrapper(model_class):
         def __init__(self, output_channel=output_channels, **kwargs):
@@ -69,7 +71,7 @@ def model_wraper(model_class, output_channels, num_points=18,
             self.regressors = nn.ModuleList()
             for _ in range(max_classes):
                 self.regressors.append(self._init_regressors(output_channel))
-            self.classifier = nn.Sequential(
+            self.cls_fc = nn.Sequential(
                 nn.Dropout(0.5),
                 nn.Linear(output_channel, num_classes),
             )
@@ -77,8 +79,10 @@ def model_wraper(model_class, output_channels, num_points=18,
             self.sigmoid = nn.Sigmoid()
 
         @staticmethod
-        def _init_regressors(output_channel):
-            return nn.Linear(output_channel, num_points)
+        def _init_regressors(output_channel=1280, intermediate_channels=640):
+            return nn.Sequential(
+                nn.Linear(output_channel, intermediate_channels),
+            )
 
         @staticmethod
         def _glob_feature_vector(x, mode, reduce_dims=True):
@@ -102,6 +106,8 @@ def model_wraper(model_class, output_channels, num_points=18,
                 choose according head for this '''
             features = self.extract_features(x)
             pooled_features = self._glob_feature_vector(features, mode=pooling_mode)
+            if model_class is MobileNetV3:
+                pooled_features = self.classifier(pooled_features)
             predicted_output = list()
             for reg in self.regressors:
                 predicted_output.append(reg(pooled_features).view(1, x.size(0), num_points // 2, 2))
@@ -114,14 +120,23 @@ def model_wraper(model_class, output_channels, num_points=18,
             ''' ordinary forward for training '''
             features = self.extract_features(x)
             pooled_features = self._glob_feature_vector(features, mode=pooling_mode)
-            kp = torch.cat([self.regressors[id_](sample) for id_, sample in zip(cats, pooled_features)], 0)
+            if model_class is MobileNetV3:
+                pooled_features = self.classifier(pooled_features)
+            # unique_cats = torch.unique(cats)
+            # separated_features = [pooled_features[cats==cls] for cls in unique_cats]
+            # assert len(separated_features) == len(unique_cats)
+            # kp = torch.cat([self.regressors[c](minibatch) for c, minibatch in
+            #                         zip(unique_cats, separated_features)])
+            kp = torch.cat([self.regressors[c](sample) for c, sample in zip(cats, pooled_features)])
             kp = self.sigmoid(kp)
+            kp = kp.view(x.size(0), num_points // 2, 2)
+            # kp = kp[torch.randperm(kp.size(0))] # shuffle data
             if num_classes > 1:
-                targets = self.classifier(pooled_features)
+                targets = self.cls_fc(pooled_features)
             else:
                 targets = cats.unsqueeze(dim=1)
 
-            return (kp.view(x.size(0), num_points // 2, 2), targets)
+            return kp, targets
 
     model = ModelWrapper(**kwargs)
     if export_mode:
