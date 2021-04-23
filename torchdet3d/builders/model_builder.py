@@ -7,7 +7,6 @@ from efficientnet_lite0_pytorch_model import EfficientnetLite0ModelFile
 from efficientnet_lite1_pytorch_model import EfficientnetLite1ModelFile
 from efficientnet_lite2_pytorch_model import EfficientnetLite2ModelFile
 
-from icecream import ic
 from torchdet3d.models import MobileNetV3, init_pretrained_weights, model_params
 from torchdet3d.utils import load_pretrained_weights
 
@@ -30,7 +29,6 @@ def build_model(config, export_mode=False, weights_path=''):
         blocks_args, global_params = get_model_params(config.model.name, override_params=None)
         model = model_wraper(model_class=EfficientNet,
                              output_channels=1280,
-                             intermediate_channels=640,
                              num_classes=config.model.num_classes,
                              blocks_args=blocks_args,
                              global_params=global_params)
@@ -42,7 +40,7 @@ def build_model(config, export_mode=False, weights_path=''):
 
     elif config.model.name == 'mobilenetv3_large':
         params = model_params['mobilenetv3_large']
-        model = model_wraper(model_class=MobileNetV3, output_channels=1280, intermediate_channels=640,
+        model = model_wraper(model_class=MobileNetV3, output_channels=1280,
                                 num_classes=config.model.num_classes, export_mode=export_mode, **params)
 
         if config.model.load_weights:
@@ -52,7 +50,7 @@ def build_model(config, export_mode=False, weights_path=''):
 
     elif config.model.name == 'mobilenetv3_small':
         params = model_params['mobilenetv3_small']
-        model = model_wraper(model_class=MobileNetV3, output_channels=1024, intermediate_channels=640,
+        model = model_wraper(model_class=MobileNetV3, output_channels=1024,
                                 num_classes=config.model.num_classes, export_mode=export_mode, **params)
 
         if config.model.load_weights:
@@ -62,7 +60,7 @@ def build_model(config, export_mode=False, weights_path=''):
 
     return model
 
-def model_wraper(model_class, output_channels, intermediate_channels, num_points=18,
+def model_wraper(model_class, output_channels, num_points=18,
                     num_classes=1, pooling_mode='avg', export_mode=False, **kwargs):
     class ModelWrapper(model_class):
         def __init__(self, output_channel=output_channels, **kwargs):
@@ -79,7 +77,7 @@ def model_wraper(model_class, output_channels, intermediate_channels, num_points
             self.sigmoid = nn.Sigmoid()
 
         @staticmethod
-        def _init_regressors(output_channel=1280, intermediate_channels=640):
+        def _init_regressors(output_channel=1280):
             return nn.Sequential(
                 nn.Linear(output_channel, num_points),
             )

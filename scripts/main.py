@@ -24,7 +24,8 @@ def main():
     parser.add_argument('--config', type=str, default='./configs/default_config.py', help='path to config')
     parser.add_argument('--device', type=str, default='cuda', choices=['cuda','cpu'],
                         help='choose device to train on')
-    parser.add_argument('--wo_saving_checkpoint', action="store_false", help='if switched on -- the chkpt will not be saved')
+    parser.add_argument('--wo_saving_checkpoint', action="store_false",
+                            help='if switched on -- the chkpt will not be saved')
     args = parser.parse_args()
     cfg = read_py_config(args.config)
     reset_config(cfg, args)
@@ -45,8 +46,6 @@ def main():
     if cfg.model.resume:
         if check_isfile(cfg.model.resume):
             start_epoch = resume_from(net, cfg.model.resume, optimizer=optimizer, scheduler=None)
-        else:
-            raise RuntimeError("checkpoint isn't found or can't be loaded!")
     else:
         start_epoch = 0
 
