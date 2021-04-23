@@ -1,18 +1,5 @@
-"""Example Evaluation script for Objectron dataset.
-
-It reads a tfrecord, runs evaluation, and outputs a summary report with name
-specified in report_file argument. When adopting this for your own model, you
-have to implement the Evaluator.predict() function, which takes an image and produces
-a 3D bounding box.
-
-Example:
-  python3 -m objectron.dataset.eval --eval_data=.../chair_test* --report_file=.../report.txt
-"""
-
+import argparse
 import os
-
-from absl import app
-from absl import flags
 
 import glob
 import numpy as np
@@ -25,7 +12,7 @@ from openvino.inference_engine import IECore
 from torchdet3d.utils import (Detector, Regressor,
                               OBJECTRON_CLASSES, draw_kp, lift_2d)
 
-from objectron.dataset.eval import (Evaluator, FLAGS, _MAX_PIXEL_ERROR,
+from objectron.dataset.eval import (Evaluator, _MAX_PIXEL_ERROR, safe_divide,
                                     _MAX_AZIMUTH_ERROR, _MAX_POLAR_ERROR, _MAX_DISTANCE)
 import objectron.dataset.metrics as metrics
 
@@ -54,11 +41,6 @@ def draw_detections(frame, reg_detections, det_detections, reg_only=True):
                    cv.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0))
 
     return frame
-
-
-flags.DEFINE_string('regression_model', None,
-                    'path to regression model config')
-flags.DEFINE_string('detection_model', None, 'path to xml')
 
 
 class Torchdet3dEvaluator(Evaluator):
@@ -192,39 +174,117 @@ class Torchdet3dEvaluator(Evaluator):
             self._adds_ap.append(adds_hit_miss, len(instances))
             self._matched += num_matched
 
+    def write_report(self, report_file):
+        """Writes a report of the evaluation."""
+        print('Writing report to ' + report_file)
 
-def main(argv):
-    if len(argv) > 1:
-        raise app.UsageError('Too many command-line arguments.')
+        def report_array(f, label, array):
+            f.write(label)
+            for val in array:
+                f.write('{:.4f},\t'.format(val))
+            f.write('\n')
 
-    class_name = FLAGS.eval_data.split(os.path.sep)[-2]
-    correct_class_index = OBJECTRON_CLASSES.index(class_name)
+        with open(report_file, 'w') as f:
+            f.write('Mean Error 2D: {}\n'.format(
+                safe_divide(self._error_2d, self._matched)))
+            f.write('Mean 3D IoU: {}\n'.format(
+                safe_divide(self._iou_3d, self._matched)))
+            f.write('Mean Azimuth Error: {}\n'.format(
+                safe_divide(self._azimuth_error, self._matched)))
+            f.write('Mean Polar Error: {}\n'.format(
+                safe_divide(self._polar_error, self._matched)))
+
+            f.write('\n')
+            f.write('IoU Thresholds: ')
+            for threshold in self._iou_thresholds:
+                f.write('{:.4f},\t'.format(threshold))
+            f.write('\n')
+            report_array(f, 'AP @3D IoU    : ', self._iou_ap.aps)
+
+            f.write('\n')
+            f.write('2D Thresholds : ')
+            for threshold in self._pixel_thresholds:
+                f.write('{:.4f},\t'.format(threshold * 0.1))
+            f.write('\n')
+            report_array(f, 'AP @2D Pixel  : ', self._pixel_ap.aps)
+            f.write('\n')
+
+            f.write('Azimuth Thresh: ')
+            for threshold in self._azimuth_thresholds:
+                f.write('{:.4f},\t'.format(threshold * 0.1))
+            f.write('\n')
+            report_array(f, 'AP @Azimuth   : ', self._azimuth_ap.aps)
+            f.write('\n')
+
+            f.write('Polar Thresh  : ')
+            for threshold in self._polar_thresholds:
+                f.write('{:.4f},\t'.format(threshold * 0.1))
+            f.write('\n')
+            report_array(f, 'AP @Polar     : ', self._polar_ap.aps)
+            f.write('\n')
+
+            f.write('ADD Thresh    : ')
+            for threshold in self._add_thresholds:
+                f.write('{:.4f},\t'.format(threshold))
+            f.write('\n')
+            report_array(f, 'AP @ADD       : ', self._add_ap.aps)
+            f.write('\n')
+
+            f.write('ADDS Thresh   : ')
+            for threshold in self._adds_thresholds:
+                f.write('{:.4f},\t'.format(threshold))
+            f.write('\n')
+            report_array(f, 'AP @ADDS      : ', self._adds_ap.aps)
+
+
+def main():
+    parser = argparse.ArgumentParser(description='converting model to onnx/mo')
+    parser.add_argument('--regression_model', type=str, default=None, required=True,
+                        help='path to regression model')
+    parser.add_argument('--detection_model', type=str, default='', required=True,
+                        help='path to detection model')
+    parser.add_argument('--eval_data_root', type=str, default='', required=True,
+                        help='Path to evaluation data.')
+    parser.add_argument('--obj_classes', type=str, nargs='+', default='bike',
+                        help='Classes to evaluate on')
+    parser.add_argument('--batch_size', type=int, default=16, required=False,
+                        help='Batch size.')
+    parser.add_argument('--max_num', type=int, default=-1, required=False,
+                        help='Max number of examples to evaluate.')
+    parser.add_argument('--report_file_prefix', type=str, default='', required=True,
+                        help='Path of the report file to write.')
+    args = parser.parse_args()
+
+    if args.obj_classes[0] == 'all':
+        args.obj_classes = OBJECTRON_CLASSES
 
     ie = IECore()
-    object_detector = Detector(ie, FLAGS.detection_model, 0.5)
-    regression_model = Regressor(ie, FLAGS.regression_model)
+    object_detector = Detector(ie, args.detection_model, 0.5)
+    regression_model = Regressor(ie, args.regression_model)
 
-    print('Starting evaluation')
-    evaluator = Torchdet3dEvaluator(
-        object_detector, regression_model, correct_class_index)
+    for cl in args.obj_classes:
+        print('Evaluating on ' + cl)
 
-    ds = tf.data.TFRecordDataset(
-        glob.glob(FLAGS.eval_data)).take(FLAGS.max_num)
-    batch = []
-    for serialized in tqdm.tqdm(ds):
-        batch.append(serialized.numpy())
-        if len(batch) == FLAGS.batch_size:
+        correct_class_index = OBJECTRON_CLASSES.index(cl)
+        evaluator = Torchdet3dEvaluator(
+            object_detector, regression_model, correct_class_index)
+
+        class_pattern = os.path.join(args.eval_data_root, cl) + os.path.sep + '*'
+        ds = tf.data.TFRecordDataset(
+            glob.glob(class_pattern)).take(args.max_num)
+        batch = []
+        for serialized in tqdm.tqdm(ds):
+            batch.append(serialized.numpy())
+            if len(batch) == args.batch_size:
+                evaluator.evaluate(batch)
+                batch.clear()
+
+        if batch:
             evaluator.evaluate(batch)
-            batch.clear()
 
-    if batch:
-        evaluator.evaluate(batch)
-
-    evaluator.finalize()
-    evaluator.write_report()
+        evaluator.finalize()
+        evaluator.write_report(args.report_file_prefix + f'_{cl}.txt')
 
 
 if __name__ == '__main__':
-    flags.mark_flag_as_required('report_file')
-    flags.mark_flag_as_required('eval_data')
-    app.run(main)
+    main()
