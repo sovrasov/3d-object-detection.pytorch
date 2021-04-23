@@ -24,8 +24,7 @@ def main():
     parser.add_argument('--config', type=str, default='./configs/default_config.py', help='path to config')
     parser.add_argument('--device', type=str, default='cuda', choices=['cuda','cpu'],
                         help='choose device to train on')
-    parser.add_argument('--save_checkpoint', type=bool, default=True,
-                        help='whether or not to save your model')
+    parser.add_argument('--wo_saving_checkpoint', action="store_false", help='if switched on -- the chkpt will not be saved')
     args = parser.parse_args()
     cfg = read_py_config(args.config)
     reset_config(cfg, args)
@@ -68,7 +67,7 @@ def main():
                       max_epoch=cfg.data.max_epochs,
                       log_path=cfg.output_dir,
                       device=args.device,
-                      save_chkpt=args.save_checkpoint,
+                      save_chkpt=args.wo_saving_checkpoint,
                       debug=cfg.utils.debug_mode,
                       debug_steps=cfg.utils.debug_steps,
                       save_freq=cfg.utils.save_freq,

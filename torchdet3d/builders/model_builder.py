@@ -81,7 +81,7 @@ def model_wraper(model_class, output_channels, intermediate_channels, num_points
         @staticmethod
         def _init_regressors(output_channel=1280, intermediate_channels=640):
             return nn.Sequential(
-                nn.Linear(output_channel, intermediate_channels),
+                nn.Linear(output_channel, num_points),
             )
 
         @staticmethod
