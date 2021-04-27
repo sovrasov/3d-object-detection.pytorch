@@ -4,7 +4,7 @@ import cv2 as cv
 import glog as log
 from openvino.inference_engine import IECore
 
-from torchdet3d.utils import draw_kp, Regressor, Detector, OBJECTRON_CLASSES
+from torchdet3d.utils import draw_kp, Regressor, Detector, OBJECTRON_CLASSES, MultiCameraTracker
 
 
 def draw_detections(frame, reg_detections, det_detections, reg_only=True):
@@ -34,6 +34,9 @@ def run(params, capture, detector, regressor, write_video=False, resolution = (1
         vout = cv.VideoWriter()
         vout.open('output_video_demo.mp4',fourcc,fps,resolution,True)
     win_name = '3D-object-detection'
+    tracker =  MultiCameraTracker(1, None, visual_analyze=None)
+
+
     has_frame, prev_frame = capture.read()
     prev_frame = cv.resize(prev_frame, resolution)
     if not has_frame:
@@ -46,7 +49,11 @@ def run(params, capture, detector, regressor, write_video=False, resolution = (1
         frame = cv.resize(frame, resolution)
         detections = detector.wait_and_grab()
         detector.run_async(frame)
-        outputs = regressor.get_detections(prev_frame, detections)
+
+        tracker.process(prev_frame, detections, None)
+        tracked_objects = tracker.get_tracked_objects()
+
+        outputs = regressor.get_detections(prev_frame, tracked_objects)
 
         vis = draw_detections(prev_frame, outputs, detections, reg_only=False)
         cv.imshow(win_name, vis)
