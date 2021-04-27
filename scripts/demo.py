@@ -2,106 +2,10 @@ import argparse
 
 import cv2 as cv
 import glog as log
-import numpy as np
 from openvino.inference_engine import IECore
 
-from demo_tools import load_ie_model
-from torchdet3d.utils import draw_kp
+from torchdet3d.utils import draw_kp, Regressor, Detector, OBJECTRON_CLASSES
 
-
-OBJECTRON_CLASSES = ('bike', 'book', 'bottle', 'cereal_box', 'camera', 'chair', 'cup', 'laptop', 'shoe')
-
-class Detector:
-    """Wrapper class for object detector"""
-    def __init__(self, ie,  model_path, conf=.6, device='CPU', ext_path=''):
-        self.net = load_ie_model(ie, model_path, device, None, ext_path)
-        self.confidence = conf
-        self.expand_ratio = (1., 1.)
-
-    def run_async(self, frame):
-        self.frame_shape = frame.shape
-        self.net.forward_async(frame)
-
-    def wait_and_grab(self):
-        outputs = self.net.grab_all_async()
-        detections = []
-        assert len(outputs) == 1
-        detections = self.__decode_detections(outputs[0], self.frame_shape)
-        return detections
-
-    def get_detections(self, frame):
-        """Returns all detections on frame"""
-        out = self.net.forward(frame)
-        detections = self.__decode_detections(out, frame.shape)
-        return detections
-
-    def __decode_detections(self, out, frame_shape):
-        """Decodes raw SSD output"""
-        detections = []
-
-        for detection in out[0, 0]:
-            label = detection[1]
-            confidence = detection[2]
-            if confidence > self.confidence:
-                left = int(max(detection[3], 0) * frame_shape[1])
-                top = int(max(detection[4], 0) * frame_shape[0])
-                right = int(max(detection[5], 0) * frame_shape[1])
-                bottom = int(max(detection[6], 0) * frame_shape[0])
-                if self.expand_ratio != (1., 1.):
-                    w = (right - left)
-                    h = (bottom - top)
-                    dw = w * (self.expand_ratio[0] - 1.) / 2
-                    dh = h * (self.expand_ratio[1] - 1.) / 2
-                    left = max(int(left - dw), 0)
-                    right = int(right + dw)
-                    top = max(int(top - dh), 0)
-                    bottom = int(bottom + dh)
-
-                detections.append(((left, top, right, bottom), confidence, label))
-
-        if len(detections) > 1:
-            detections.sort(key=lambda x: x[1], reverse=True)
-        return detections
-
-
-class Regressor:
-    """Wrapper class for regression model"""
-    def __init__(self, ie,  model_path, device='CPU', ext_path=''):
-        self.net = load_ie_model(ie, model_path, device, None, ext_path)
-
-    def get_detections(self, frame, detections):
-        """Returns all detections on frame"""
-        outputs = []
-        for rect in detections:
-            cropped_img = self.crop(frame, rect[0])
-            out = self.net.forward(cropped_img)
-            out = self.__decode_detections(out, rect)
-            outputs.append(out)
-        return outputs
-
-    def __decode_detections(self, out, rect):
-        """Decodes raw regression model output"""
-        label = int(rect[2])
-        kp = out[label]
-        kp = self.transform_kp(kp[0], rect[0])
-
-        return (kp, label)
-
-    @staticmethod
-    def transform_kp(kp: np.array, crop_cords: tuple):
-        x0,y0,x1,y1 = crop_cords
-        crop_shape = (x1-x0,y1-y0)
-        kp[:,0] = kp[:,0]*crop_shape[0]
-        kp[:,1] = kp[:,1]*crop_shape[1]
-        kp[:,0] += x0
-        kp[:,1] += y0
-        return kp
-
-    @staticmethod
-    def crop(frame, rect):
-        x0, y0, x1, y1 = rect
-        crop = frame[y0:y1, x0:x1]
-        return crop
 
 def draw_detections(frame, reg_detections, det_detections, reg_only=True):
     """Draws detections and labels"""
@@ -162,8 +66,6 @@ def main():
     parser.add_argument('--video', type=str, default=None, help='Input video')
     parser.add_argument('--cam_id', type=int, default=-1, help='Input cam')
     parser.add_argument('--resolution', type=int, nargs='+', help='capture resolution')
-    parser.add_argument('--config', type=str, default=None, required=False,
-                        help='Configuration file')
     parser.add_argument('--od_model', type=str, required=True)
     parser.add_argument('--reg_model', type=str, required=True)
     parser.add_argument('--det_tresh', type=float, required=False, default=0.7)
@@ -185,7 +87,6 @@ def main():
         assert args.video, "No video input was given"
         log.info('Reading from {}'.format(args.video))
         cap = cv.VideoCapture(args.video)
-        cap.set(cv.CAP_PROP_FOURCC, cv.VideoWriter_fourcc(*'MJPG'))
     assert cap.isOpened()
     ie = IECore()
     object_detector = Detector(ie, args.od_model, args.det_tresh, args.device, args.cpu_extension)
