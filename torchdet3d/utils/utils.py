@@ -143,8 +143,6 @@ def load_pretrained_weights(model, file_path='', pretrained_dict=None):
                        if not pretrained_dict
                        else pretrained_dict)
 
-    if 'classes_map' in checkpoint:
-        model.classification_classes = checkpoint['classes_map']
     if 'state_dict' in checkpoint:
         state_dict = checkpoint['state_dict']
     else:
