@@ -17,6 +17,7 @@ import torch
 from addict import Dict as adict
 
 from objectron.dataset import graphics
+#pylint: disable = consider-using-with
 
 OBJECTRON_CLASSES = ('bike', 'book', 'bottle', 'cereal_box', 'camera', 'chair', 'cup', 'laptop', 'shoe')
 

@@ -11,6 +11,7 @@ if module_path not in sys.path:
     sys.path.append(module_path)
 
 #pylint: disable = wrong-import-position
+#pylint: disable = consider-using-with
 from objectron.schema import annotation_data_pb2 as annotation_protocol
 
 # The annotations are stored in protocol buffer format.
