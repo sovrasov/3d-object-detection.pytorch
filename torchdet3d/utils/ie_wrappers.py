@@ -12,6 +12,7 @@ import logging
 from tqdm import tqdm
 from scipy.optimize import linear_sum_assignment
 from scipy.spatial.distance import cosine, cdist
+from icecream import ic
 
 __all__ = ['Regressor', 'Detector', 'MultiCameraTracker']
 THE_BIGGEST_DISTANCE = 10.
@@ -145,7 +146,11 @@ class IEModel:
     def forward(self, img):
         """Performs forward pass of the wrapped IE model"""
         res = self.net.infer(inputs={self.input_key: self._preprocess(img)})
+<<<<<<< HEAD
         return [res[key] for key in self.output_key]
+=======
+        return [res[key] for key in self.output_key],
+>>>>>>> added tracking functionality to pipeline
 
     def forward_async(self, img):
         id_ = len(self.reqs_ids)
@@ -179,7 +184,11 @@ def load_ie_model(ie, model_xml, device, plugin_dir, cpu_extension='', num_reqs=
     net = ie.read_network(model_xml, os.path.splitext(model_xml)[0] + ".bin")
     log.info("Preparing input blobs")
     input_blob = next(iter(net.input_info))
+<<<<<<< HEAD
     out_blob = net.outputs
+=======
+    out_blob = [key for key in net.outputs]
+>>>>>>> added tracking functionality to pipeline
     net.batch_size = 1
 
     # Loading model to the plugin
@@ -281,251 +290,6 @@ class Regressor:
         crop = frame[y0:y1, x0:x1]
         return crop
 
-
-
-class Analyzer(object):
-    def __init__(self, cam_id, enable,
-                 show_distances=True,
-                 concatenate_imgs_with_distances=True,
-                 plot_timeline_freq=0,
-                 save_distances='',
-                 save_timeline='',
-                 crop_size=(32, 64)):
-        self.enable = enable
-        self.id = cam_id
-        self.show_distances = show_distances
-        self.concatenate_distances = concatenate_imgs_with_distances
-        self.plot_timeline_freq = plot_timeline_freq
-
-        self.save_distances = os.path.join(save_distances, 'sct_{}'.format(cam_id)) \
-            if len(save_distances) else ''
-        self.save_timeline = os.path.join(save_timeline, 'sct_{}'.format(cam_id)) \
-            if len(save_timeline) else ''
-
-        if self.save_distances and not os.path.exists(self.save_distances):
-            os.makedirs(self.save_distances)
-        if self.save_timeline and not os.path.exists(self.save_timeline):
-            os.makedirs(self.save_timeline)
-
-        self.dist_names = ['Latest_feature', 'Average_feature', 'Cluster_feature', 'GIoU', 'Affinity_matrix']
-        self.distance_imgs = [None for _ in range(len(self.dist_names))]
-        self.current_detections = []  # list of numpy arrays
-        self.crop_size = crop_size  # w x h
-
-    def prepare_distances(self, tracks, current_detections):
-        tracks_num = len(tracks)
-        detections_num = len(current_detections)
-        w, h = self.crop_size
-
-        target_height = detections_num + 2
-        target_width = tracks_num + 2
-
-        img_size = (
-            self.crop_size[1] * target_height,
-            self.crop_size[0] * target_width, 3
-        )
-
-        for j, dist_img in enumerate(self.distance_imgs):
-            self.distance_imgs[j] = np.full(img_size, 225, dtype='uint8')
-            dist_img = self.distance_imgs[j]
-            # Insert IDs:
-            # 1. Tracked objects
-            for i, track in enumerate(tracks):
-                id = str(track.id)
-                dist_img = cv.putText(dist_img, id, ((i + 2) * w + 5, 24), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
-            # 2. Current detections
-            for i, det in enumerate(current_detections):
-                id = str(i)
-                dist_img = cv.putText(dist_img, id, (5, (i + 2) * h + 24), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
-            # Insert crops
-            # 1. Tracked objects (the latest crop)
-            for i, track in enumerate(tracks):
-                crop = track.crops[-1]
-                y0, y1, x0, x1 = h, h * 2, (i + 2) * w, (i + 2) * w + w
-                dist_img[y0: y1, x0: x1, :] = crop
-            # 2. Current detections
-            for i, det in enumerate(current_detections):
-                dist_img[(i + 2) * h: (i + 2) * h + h, w: w * 2, :] = det
-            # Insert grid line
-            for n, i in enumerate(range(self.crop_size[1], dist_img.shape[0] + 1, self.crop_size[1])):
-                x0, y0, x1, y1 = 0, i, dist_img.shape[1] - 1, i
-                x0 = self.crop_size[0] * 2 if n < 1 else x0
-                cv.line(dist_img, (x0, y0 - 1), (x1, y1 - 1), (0, 0, 0), 1, 1)
-            for n, i in enumerate(range(0, dist_img.shape[1] + 1, self.crop_size[0])):
-                x0, y0, x1, y1 = i, 0, i, dist_img.shape[0] - 1
-                y0 = self.crop_size[1] * 2 if n == 1 else y0
-                cv.line(dist_img, (x0 - 1, y0), (x1 - 1, y1), (0, 0, 0), 1, 1)
-            # Insert hat
-            x0, y0, x1, y1 = 0, 0, self.crop_size[0] * 2, self.crop_size[1] * 2
-            cv.line(dist_img, (x0, y0), (x1, y1), (0, 0, 0), 1, 1)
-            dist_img = cv.putText(dist_img, 'Tracks', (12, 24), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-            dist_img = cv.putText(dist_img, 'Detect', (4, 120), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-
-    def visualize_distances(self, id_track=0, id_det=0, distances=None, affinity_matrix=None, active_tracks_idx=None):
-        w, h = self.crop_size
-        if affinity_matrix is None:
-            for k, dist in enumerate(distances):
-                value = str(dist)[:4] if dist else ' -'
-                dist_img = self.distance_imgs[k]
-                position = ((id_track + 2) * w + 1, (id_det + 2) * h + 24)
-                dist_img = cv.putText(dist_img, value, position, cv.FONT_HERSHEY_SIMPLEX, 0.41, (0, 0, 0), 1)
-        else:
-            dist_img = self.distance_imgs[-1]
-            for i in range(affinity_matrix.shape[0]):
-                for j in range(affinity_matrix.shape[1]):
-                    value = str(affinity_matrix[i][j])[:4] if affinity_matrix[i][j] else ' -'
-                    track_id = active_tracks_idx[j]
-                    position = ((track_id + 2) * w + 1, (i + 2) * h + 24)
-                    dist_img = cv.putText(dist_img, value, position, cv.FONT_HERSHEY_SIMPLEX, 0.41, (0, 0, 0), 1)
-
-    def show_all_dist_imgs(self, time, active_tracks):
-        if self.distance_imgs[0] is None or not active_tracks:
-            return
-        concatenated_dist_img = None
-        if self.concatenate_distances:
-            for i, img in enumerate(self.distance_imgs):
-                width = img.shape[1]
-                height = 32
-                title = np.full((height, width, 3), 225, dtype='uint8')
-                title = cv.putText(title, self.dist_names[i], (5, 20), cv.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 1)
-                cv.line(title, (0, height - 1), (width - 1, height - 1), (0, 0, 0), 1, 1)
-                cv.line(title, (width - 1, 0), (width - 1, height - 1), (0, 0, 0), 1, 1)
-                img = np.vstack([title, img])
-                self.distance_imgs[i] = img
-            concatenated_dist_img = np.hstack([self.distance_imgs[i] for i in range(0, 3)])
-            concatenated_iou_am_img = np.hstack([self.distance_imgs[i] for i in range(3, 5)])
-            empty_img = np.full(self.distance_imgs[2].shape, 225, dtype='uint8')
-            concatenated_iou_am_img = np.hstack([concatenated_iou_am_img, empty_img])
-            concatenated_dist_img = np.vstack([concatenated_dist_img, concatenated_iou_am_img])
-
-        if self.show_distances:
-            if concatenated_dist_img is not None:
-                cv.imshow('SCT_{}_Distances'.format(self.id), concatenated_dist_img)
-            else:
-                for i, img in enumerate(self.distance_imgs):
-                    cv.imshow(self.dist_names[i], img)
-        if len(self.save_distances):
-            if concatenated_dist_img is not None:
-                file_path = os.path.join(self.save_distances, 'frame_{}_dist.jpg'.format(time))
-                cv.imwrite(file_path, concatenated_dist_img)
-            else:
-                for i, img in enumerate(self.distance_imgs):
-                    file_path = os.path.join(self.save_distances, 'frame_{}_{}.jpg'.format(time, self.dist_names[i]))
-                    cv.imwrite(file_path, img)
-
-    def plot_timeline(self, id, time, tracks):
-        if self.plot_timeline_freq > 0 and time % self.plot_timeline_freq == 0:
-            plot_timeline(id, time, tracks, self.save_timeline,
-                          name='SCT', show_online=self.plot_timeline_freq)
-
-
-def save_embeddings(scts, save_path, use_images=False, step=0):
-    def make_label_img(label_img, crop, target_size=(32, 32)):
-        img = cv.resize(crop, target_size)  # Resize, size must be square
-        img = cv.cvtColor(img, cv.COLOR_BGR2RGB)  # BGR to RGB
-        img = np.transpose(img, (2, 0, 1)) / 255  # Scale
-        label_img = np.expand_dims(img, 0) if label_img is None else \
-            np.concatenate((label_img, np.expand_dims(img, 0)))
-        return label_img
-
-    embeddings_all = None
-    embeddings_avg = None
-    embeddings_clust = None
-    metadata_avg = []
-    metadata_all = []
-    metadata_clust = []
-    label_img_all = None
-    label_img_avg = None
-    label_img_clust = None
-    for i, sct in enumerate(scts):
-        for track in tqdm(sct.tracks, 'Processing embeddings: SCT#{}...'.format(i)):
-            if use_images and len(track.crops) == 1 and track.crops[0] is None:
-                logging.warning('For embeddings was enabled parameter \'use_images\' but images were not found!'
-                            '\'use_images\' switched off. Please check if parameter \'enable\' for analyzer'
-                            'is set to True')
-                use_images = False
-            # Collect average embeddings
-            if isinstance(track.f_avg.avg, int):
-                continue
-            embeddings_avg = track.f_avg.avg.reshape((1, -1)) if embeddings_avg is None else \
-                np.concatenate((embeddings_avg, track.f_avg.avg.reshape((1, -1))))
-            metadata_avg.append('sct_{}_'.format(i) + str(track.id))
-            if use_images:
-                label_img_avg = make_label_img(label_img_avg, track.crops[0])
-            # Collect all embeddings
-            features = None
-            offset = 0
-            for j, f in enumerate(track.features):
-                if f is None:
-                    offset += 1
-                    continue
-                features = f.reshape((1, -1)) if features is None else \
-                    np.concatenate((features, f.reshape((1, -1))))
-                metadata_all.append(track.id)
-                if use_images:
-                    crop = track.crops[j - offset]
-                    label_img_all = make_label_img(label_img_all, crop)
-            embeddings_all = features if embeddings_all is None else \
-                np.concatenate((embeddings_all, features))
-            # Collect clustered embeddings
-            for j, f_clust in enumerate(track.f_clust.clusters):
-                embeddings_clust = f_clust.reshape((1, -1)) if embeddings_clust is None else \
-                                    np.concatenate((embeddings_clust, f_clust.reshape((1, -1))))
-                metadata_clust.append(str(track.id))
-                if use_images:
-                    label_img_clust = make_label_img(label_img_clust, track.crops[j])
-
-def plot_timeline(sct_id, last_frame_num, tracks, save_path='', name='', show_online=False):
-    def find_max_id():
-        max_id = 0
-        for track in tracks:
-            if isinstance(track, dict):
-                track_id = track['id']
-            else:
-                track_id = track.id
-            if track_id > max_id:
-                max_id = track_id
-        return max_id
-
-    if not show_online and not len(save_path):
-        return
-    plot_name = '{}#{}'.format(name, sct_id)
-    plt.figure(plot_name, figsize=(24, 13.5))
-    last_id = find_max_id()
-    xy = np.full((last_id + 1, last_frame_num + 1), -1, dtype='int32')
-    x = np.arange(last_frame_num + 1, dtype='int32')
-    y = np.arange(last_id + 1, dtype='int32')
-
-    plt.xticks(x)
-    plt.yticks(y)
-    plt.xlabel('Frame')
-    plt.ylabel('Identity')
-
-    colors = []
-    for track in tracks:
-        if isinstance(track, dict):
-            frame_ids = track['timestamps']
-            track_id = track['id']
-        else:
-            frame_ids = track.timestamps
-            track_id = track.id
-        if frame_ids[-1] > last_frame_num:
-            frame_ids = [timestamp for timestamp in frame_ids if timestamp < last_frame_num]
-        xy[track_id][frame_ids] = track_id
-        xx = np.where(xy[track_id] == -1, np.nan, x)
-        if track_id >= 0:
-            color = COLOR_PALETTE[track_id % len(COLOR_PALETTE)] if track_id >= 0 else (0, 0, 0)
-            color = [x / 255 for x in color]
-        else:
-            color = (0, 0, 0)
-        colors.append(tuple(color[::-1]))
-        plt.plot(xx, xy[track_id], marker=".", color=colors[-1], label='ID#{}'.format(track_id))
-    if save_path:
-        file_name = os.path.join(save_path, 'timeline_{}.jpg'.format(plot_name))
-        plt.savefig(file_name, bbox_inches='tight')
-    if show_online:
-        plt.draw()
-        plt.pause(0.01)
 
 class ClusterFeature:
     def __init__(self, feature_len, initial_feature=None):
@@ -707,8 +471,7 @@ class MultiCameraTracker:
                  sct_config={},
                  time_window=20,
                  global_match_thresh=0.35,
-                 bbox_min_aspect_ratio=1.2,
-                 visual_analyze=None,
+                 bbox_min_aspect_ratio=0,
                  ):
         self.scts = []
         self.time = 0
@@ -724,7 +487,7 @@ class MultiCameraTracker:
         for i in range(num_sources):
             self.scts.append(SingleCameraTracker(i, self._get_next_global_id,
                                                  self._release_global_id,
-                                                 reid_model, visual_analyze=visual_analyze, **sct_config))
+                                                 reid_model, **sct_config))
 
     def process(self, frames, all_detections, masks=None):
         assert len(frames) == len(all_detections) == len(self.scts)
@@ -779,8 +542,8 @@ class MultiCameraTracker:
             ar = h / w
             if ar > self.bbox_min_aspect_ratio:
                 clean_detections.append(det)
-                if i < len(masks):
-                    clean_masks.append(masks[i])
+                # if i < len(masks):
+                #     clean_masks.append(masks[i])
         return clean_detections, clean_masks
 
     def _compute_mct_distance_matrix(self, all_tracks):
@@ -840,7 +603,6 @@ class SingleCameraTracker:
                  detection_occlusion_thresh=0.7,
                  track_detection_iou_thresh=0.5,
                  process_curr_features_number=0,
-                 visual_analyze=None,
                  interpolate_time_thresh=10,
                  detection_filter_speed=0.7,
                  rectify_thresh=0.25):
@@ -879,11 +641,7 @@ class SingleCameraTracker:
         assert 0 <= rectify_thresh <= 1
         self.rectify_thresh = rectify_thresh
 
-        self.analyzer = None
         self.current_detections = None
-
-        if visual_analyze is not None:
-            self.analyzer = Analyzer(self.id, **visual_analyze)
 
     def process(self, frame, detections, mask=None):
         reid_features = [None]*len(detections)
@@ -896,8 +654,6 @@ class SingleCameraTracker:
         self._rectify_tracks()
         if self.time % self.time_window == 0:
             self._merge_tracks()
-        if self.analyzer:
-            self.analyzer.plot_timeline(self.id, self.time, self.tracks)
         self.time += 1
 
     def get_tracked_objects(self):
@@ -1117,15 +873,13 @@ class SingleCameraTracker:
         assert len(detections) == len(features)
         for i, j in enumerate(assignment):
             if j is None:
-                crop = self.current_detections[i] if self.analyzer else None
+                crop = None
                 self.tracks.append(Track(self.global_id_getter(), self.id,
                                          detections[i], self.time, features[i],
                                          self.n_clusters, crop, None))
 
     def _compute_detections_assignment_cost(self, active_tracks_idx, detections, features):
         cost_matrix = np.zeros((len(detections), len(active_tracks_idx)), dtype=np.float32)
-        if self.analyzer and len(self.tracks) > 0:
-            self.analyzer.prepare_distances(self.tracks, self.current_detections)
 
         for i, idx in enumerate(active_tracks_idx):
             track_box = self.tracks[idx].get_last_box()
@@ -1151,11 +905,7 @@ class SingleCameraTracker:
                 else:
                     reid_dist = 0.5
                 cost_matrix[j, i] = iou_dist * reid_dist
-                if self.analyzer:
-                    self.analyzer.visualize_distances(idx, j, [reid_dist_curr, reid_dist_avg, reid_dist_clust, 1 - iou_dist])
-        if self.analyzer:
-            self.analyzer.visualize_distances(affinity_matrix=1 - cost_matrix, active_tracks_idx=active_tracks_idx)
-            self.analyzer.show_all_dist_imgs(self.time, len(self.tracks))
+
         return cost_matrix
 
     @staticmethod
@@ -1200,9 +950,6 @@ class SingleCameraTracker:
         rois = []
         embeddings = []
 
-        if self.analyzer:
-            self.current_detections = []
-
         for i in range(len(detections)):
             rect = detections[i]
             left, top, right, bottom = rect
@@ -1211,9 +958,6 @@ class SingleCameraTracker:
                 crop = cv.bitwise_and(crop, crop, mask=mask[i])
             if left != right and top != bottom:
                 rois.append(crop)
-
-            if self.analyzer:
-                self.current_detections.append(cv.resize(crop, self.analyzer.crop_size))
 
         if rois:
             embeddings = self.reid_model.forward(rois)

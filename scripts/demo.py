@@ -1,8 +1,11 @@
 import argparse
 
 import cv2 as cv
+import numpy as np
 import glog as log
+
 from openvino.inference_engine import IECore
+from icecream import ic
 
 from torchdet3d.utils import draw_kp, Regressor, Detector, OBJECTRON_CLASSES, MultiCameraTracker
 
@@ -10,7 +13,7 @@ from torchdet3d.utils import draw_kp, Regressor, Detector, OBJECTRON_CLASSES, Mu
 def draw_detections(frame, reg_detections, det_detections, reg_only=True):
     """Draws detections and labels"""
     for det_out, reg_out in zip(det_detections, reg_detections):
-        left, top, right, bottom = det_out[0]
+        left, top, right, bottom = det_out[:4]
         kp = reg_out[0]
         label = reg_out[1]
         label = OBJECTRON_CLASSES[label]
@@ -34,8 +37,7 @@ def run(params, capture, detector, regressor, write_video=False, resolution = (1
         vout = cv.VideoWriter()
         vout.open('output_video_demo.mp4',fourcc,fps,resolution,True)
     win_name = '3D-object-detection'
-    tracker =  MultiCameraTracker(1, None, visual_analyze=None)
-
+    tracker =  MultiCameraTracker(1, None)
 
     has_frame, prev_frame = capture.read()
     prev_frame = cv.resize(prev_frame, resolution)
@@ -49,13 +51,17 @@ def run(params, capture, detector, regressor, write_video=False, resolution = (1
         frame = cv.resize(frame, resolution)
         detections = detector.wait_and_grab()
         detector.run_async(frame)
-
-        tracker.process(prev_frame, detections, None)
+        ic(detections)
+        tracker.process(np.expand_dims(prev_frame, 0), [detections], None)
         tracked_objects = tracker.get_tracked_objects()
+        ic(tracked_objects)
+        if all(tracked_objects):
+            rectangles = [rect.rect for rect in tracked_objects[0]]
+        else:
+            rectangles = detections
+        outputs = regressor.get_detections(prev_frame, rectangles)
 
-        outputs = regressor.get_detections(prev_frame, tracked_objects)
-
-        vis = draw_detections(prev_frame, outputs, detections, reg_only=False)
+        vis = draw_detections(prev_frame, outputs, rectangles, reg_only=False)
         cv.imshow(win_name, vis)
         if write_video:
             vout.write(vis)
