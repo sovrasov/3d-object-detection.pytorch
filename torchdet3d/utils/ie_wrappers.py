@@ -24,7 +24,7 @@ class IEModel:
     def forward(self, img):
         """Performs forward pass of the wrapped IE model"""
         res = self.net.infer(inputs={self.input_key: self._preprocess(img)})
-        return np.copy(res[self.output_key])
+        return [res[key] for key in self.output_key],
 
     def forward_async(self, img):
         id_ = len(self.reqs_ids)
@@ -36,8 +36,8 @@ class IEModel:
         outputs = []
         for id_ in self.reqs_ids:
             self.net.requests[id_].wait(-1)
-            res = self.net.requests[id_].output_blobs[self.output_key].buffer
-            outputs.append(np.copy(res))
+            output_list = [self.net.requests[id_].output_blobs[key].buffer for key in self.output_key]
+            outputs.append(output_list)
         self.reqs_ids = []
         return outputs
 
@@ -56,10 +56,9 @@ def load_ie_model(ie, model_xml, device, plugin_dir, cpu_extension='', num_reqs=
     # Read IR
     log.info("Loading network")
     net = ie.read_network(model_xml, os.path.splitext(model_xml)[0] + ".bin")
-
     log.info("Preparing input blobs")
     input_blob = next(iter(net.input_info))
-    out_blob = next(iter(net.outputs))
+    out_blob = [key for key in net.outputs]
     net.batch_size = 1
 
     # Loading model to the plugin
@@ -84,13 +83,13 @@ class Detector:
         outputs = self.net.grab_all_async()
         detections = []
         assert len(outputs) == 1
-        detections = self.__decode_detections(outputs[0], self.frame_shape)
+        detections = self.__decode_detections(outputs[0][0], self.frame_shape)
         return detections
 
     def get_detections(self, frame):
         """Returns all detections on frame"""
         out = self.net.forward(frame)
-        detections = self.__decode_detections(out, frame.shape)
+        detections = self.__decode_detections(out[0], frame.shape)
         return detections
 
     def __decode_detections(self, out, frame_shape):
@@ -115,7 +114,7 @@ class Detector:
                     top = max(int(top - dh), 0)
                     bottom = int(bottom + dh)
 
-                detections.append(((left, top, right, bottom), confidence, label))
+                detections.append((left, top, right, bottom, confidence, label))
 
         if len(detections) > 1:
             detections.sort(key=lambda x: x[1], reverse=True)
@@ -131,17 +130,17 @@ class Regressor:
         """Returns all detections on frame"""
         outputs = []
         for rect in detections:
-            cropped_img = self.crop(frame, rect[0])
+            cropped_img = self.crop(frame, rect[:4])
             out = self.net.forward(cropped_img)
-            out = self.__decode_detections(out, rect)
+            out = self.__decode_detections(out[0], rect)
             outputs.append(out)
         return outputs
 
     def __decode_detections(self, out, rect):
         """Decodes raw regression model output"""
-        label = int(rect[2])
-        kp = out[label]
-        kp = self.transform_kp(kp[0], rect[0])
+        label = np.argmax(out[0])
+        kp = out[1][label]
+        kp = self.transform_kp(kp[0], rect[:4])
 
         return (kp, label)
 

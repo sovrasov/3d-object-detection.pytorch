@@ -1,4 +1,4 @@
-albumentations==0.5.2
+albumentations
 addict
 opencv-python
 numpy
@@ -9,7 +9,7 @@ tensorboard
 onnx
 glog
 torchvision
-torch==1.7.1
+torch
 gdown
 icecream
 efficientnet_lite_pytorch

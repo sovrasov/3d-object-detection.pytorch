@@ -11,7 +11,6 @@ if module_path not in sys.path:
     sys.path.append(module_path)
 
 #pylint: disable = wrong-import-position
-#pylint: disable = consider-using-with
 from objectron.schema import annotation_data_pb2 as annotation_protocol
 
 # The annotations are stored in protocol buffer format.
@@ -91,12 +90,12 @@ def grab_frames(video_file, frame_ids, use_opencv=True):
                 'ffmpeg', '-i', video_file, '-f', 'image2pipe', '-vf', frame_filter,
                 '-pix_fmt', 'rgb24', '-vcodec', 'rawvideo', '-vsync', 'vfr', '-'
             ]
-            pipe = subprocess.Popen(
-                command, stdout=subprocess.PIPE, bufsize=151 * frame_size, stderr=subprocess.DEVNULL)
-            current_frame = np.frombuffer(
-                pipe.stdout.read(frame_size), dtype='uint8').reshape(height, width, 3)
-            pipe.stdout.flush()
-            frames[frame_id] = cv2.cvtColor(current_frame, cv2.COLOR_BGR2RGB)
+            with subprocess.Popen(
+                command, stdout=subprocess.PIPE, bufsize=151 * frame_size, stderr=subprocess.DEVNULL) as pipe:
+                current_frame = np.frombuffer(
+                    pipe.stdout.read(frame_size), dtype='uint8').reshape(height, width, 3)
+                pipe.stdout.flush()
+                frames[frame_id] = cv2.cvtColor(current_frame, cv2.COLOR_BGR2RGB)
 
     return frames
 
