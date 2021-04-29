@@ -38,16 +38,15 @@ def build_augmentations(cfg):
     train_transform = A.Compose([
                             ConvertColor(),
                             A.Resize(*cfg.data.resize),
-                            A.HorizontalFlip(p=0.3),
+                            A.HorizontalFlip(p=0.35),
                             # A.Rotate(limit=30, p=0.3),
                             A.OneOf([
                                         A.HueSaturationValue(p=0.3),
                                         A.RGBShift(p=0.3),
                                         A.RandomBrightnessContrast(p=0.3),
-                                        A.CLAHE(p=0.3),
                                         A.ColorJitter(p=0.3),
                                     ], p=1),
-                            A.Blur(blur_limit=5, p=0.3),
+                            A.Blur(blur_limit=5, p=0.15),
                             # A.IAAPiecewiseAffine(p=0.3),
                             normalize,
                             ToTensor(cfg.data.resize)
