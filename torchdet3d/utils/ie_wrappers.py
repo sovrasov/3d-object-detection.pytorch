@@ -24,7 +24,7 @@ class IEModel:
     def forward(self, img):
         """Performs forward pass of the wrapped IE model"""
         res = self.net.infer(inputs={self.input_key: self._preprocess(img)})
-        return [res[key] for key in self.output_key],
+        return [res[key] for key in self.output_key]
 
     def forward_async(self, img):
         id_ = len(self.reqs_ids)
@@ -58,7 +58,7 @@ def load_ie_model(ie, model_xml, device, plugin_dir, cpu_extension='', num_reqs=
     net = ie.read_network(model_xml, os.path.splitext(model_xml)[0] + ".bin")
     log.info("Preparing input blobs")
     input_blob = next(iter(net.input_info))
-    out_blob = [key for key in net.outputs]
+    out_blob = net.outputs
     net.batch_size = 1
 
     # Loading model to the plugin
