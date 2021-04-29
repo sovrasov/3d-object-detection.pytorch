@@ -12,7 +12,7 @@ from torchdet3d.utils import load_pretrained_weights
 
 __AVAI_MODELS__ = {
                     'mobilenetv3_large', 'mobilenetv3_small', 'efficientnet-lite0', 'efficientnet-lite1',
-                    'efficientnet-lite2',
+                    'efficientnet-lite2', 'mobilenetv3_large_21k',
                   }
 
 EFFICIENT_NET_WEIGHTS = {
@@ -57,6 +57,15 @@ def build_model(config, export_mode=False, weights_path=''):
             load_pretrained_weights(model, config.model.load_weights)
         elif config.model.pretrained and not export_mode:
             init_pretrained_weights(model, key='mobilenetv3_small')
+
+    elif config.model.name == 'mobilenetv3_large_21k':
+        assert config.model.pretrained == False
+        from torchdet3d.models.mobilenetv3_timm import MobileNetV3_large_100
+        model = model_wraper(model_class=MobileNetV3_large_100, output_channels=1280,
+                             num_classes=config.model.num_classes, export_mode=export_mode)
+
+        if config.model.load_weights:
+            load_pretrained_weights(model, config.model.load_weights)
 
     return model
 
@@ -139,3 +148,21 @@ def model_wraper(model_class, output_channels, num_points=18,
     if export_mode:
         model.forward = model.forward_to_onnx
     return model
+<<<<<<< HEAD
+=======
+
+def test(config):
+    model = build_model(config)
+    img = torch.rand(128,3,224,224)
+    cats = torch.randint(0,5,(128,))
+    out = model(img, cats)
+    ic(out[0].shape, out[1].shape)
+
+if __name__ == "__main__":
+    from torchdet3d.utils import read_py_config
+    parser = argparse.ArgumentParser(description='3D-object-detection training')
+    parser.add_argument('--config', type=str, default='./configs/mobilenet_21k.py', help='path to config')
+    args = parser.parse_args()
+    cfg = read_py_config(args.config)
+    test(cfg)
+>>>>>>> Add timm MNV3
