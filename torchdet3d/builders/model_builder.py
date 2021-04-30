@@ -65,7 +65,7 @@ def build_model(config, export_mode=False, weights_path=''):
                              num_classes=config.model.num_classes, export_mode=export_mode)
 
         if config.model.load_weights:
-            load_pretrained_weights(model, config.model.load_weights)
+            load_pretrained_weights(model, config.model.load_weights, extra_prefix='model.')
 
     return model
 
@@ -148,21 +148,3 @@ def model_wraper(model_class, output_channels, num_points=18,
     if export_mode:
         model.forward = model.forward_to_onnx
     return model
-<<<<<<< HEAD
-=======
-
-def test(config):
-    model = build_model(config)
-    img = torch.rand(128,3,224,224)
-    cats = torch.randint(0,5,(128,))
-    out = model(img, cats)
-    ic(out[0].shape, out[1].shape)
-
-if __name__ == "__main__":
-    from torchdet3d.utils import read_py_config
-    parser = argparse.ArgumentParser(description='3D-object-detection training')
-    parser.add_argument('--config', type=str, default='./configs/mobilenet_21k.py', help='path to config')
-    args = parser.parse_args()
-    cfg = read_py_config(args.config)
-    test(cfg)
->>>>>>> Add timm MNV3
