@@ -1,6 +1,5 @@
 import math
 
-import torch
 import torch.nn as nn
 
 from  torchdet3d.utils import load_pretrained_weights
@@ -186,17 +185,17 @@ class MobileNetV3(nn.Module):
         self.conv = conv_1x1_bn(input_channel, exp_size)
         output_channel = {'large': 1280, 'small': 1024}
         output_channel = _make_divisible(output_channel[mode] * width_mult, 8) if width_mult > 1.0 else output_channel[mode]
-        self.conv_head = nn.Conv2d(exp_size, output_channel, kernel_size=1, bias=False)
-        self.bn_head = nn.BatchNorm2d(num_features=output_channel)
-        self.non_linearity = h_swish()
+        self.classifier = nn.Sequential(
+            nn.Linear(exp_size, output_channel),
+            nn.BatchNorm1d(output_channel),
+            h_swish(),
+        )
 
         self._initialize_weights()
 
     def  extract_features(self, x):
         x = self.features(x)
         x = self.conv(x)
-        x = self.conv_head(x)
-        x = self.non_linearity(self.bn_head(x))
 
         return x
 
@@ -224,9 +223,7 @@ def init_pretrained_weights(model, key=''):
     Layers that don't match with pretrained layers in name or size are kept unchanged.
     """
     import os
-    import sys
     import errno
-    import inspect
     import gdown
 
     def _get_torch_home():

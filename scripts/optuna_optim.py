@@ -27,19 +27,12 @@ def objective(cfg, args, trial):
     if (torch.cuda.is_available() and args.device == 'cuda' and cfg.data_parallel.use_parallel):
         model = torch.nn.DataParallel(model, **cfg.data_parallel.parallel_params)
     # Generate the trials.
-    steps = trial.suggest_categorical("steps", ['40/60/90', '50/70/90', '60/75/90', '70/80/90', '30', '50', '70'])
-    epoch = trial.suggest_int("epochs", 100, 250)
-    gamma = trial.suggest_categorical("gamma", [i/10 for i in range(1,7)])
-    if len(steps) > 2:
-        cfg['scheduler']['name'] = 'multistepLR'
-        cfg['scheduler']['steps'] = [ int(int(i)/100 * epoch) for i in steps.split('/')]
-    else:
-        cfg['scheduler']['name'] = 'stepLR'
-        cfg['scheduler']['steps'] = [int(steps)]
+    eps = trial.suggest_float("eps", 0.01, 3)
+    w = trial.suggest_float("w", 0.01, 10)
 
-    cfg['scheduler']['gamma'] = gamma
-    args.epochs = epoch
-    print(f"\nnext trial with [steps: {cfg.scheduler.steps}, epochs: {epoch}, gamma: {gamma}]")
+    cfg['loss']['w'] = w
+    cfg['loss']['eps'] = eps
+    print(f"\nnext trial with [w: {w}, epsilon: {eps}]")
 
     optimizer = build_optimizer(cfg, model)
     scheduler = build_scheduler(cfg, optimizer)
@@ -144,11 +137,11 @@ def main():
     # parse arguments
     parser = argparse.ArgumentParser(description='3D-object-detection training')
     parser.add_argument('--root', type=str, default='', help='path to root folder')
-    parser.add_argument('--store_log', action='store_true')
+    parser.add_argument('--disable_store_log', action='store_false')
     parser.add_argument('--config', type=str, default='./configs/default_config.py', help='path to config')
     parser.add_argument('--device', type=str, default='cuda', choices=['cuda','cpu'],
                         help='choose device to train on')
-    parser.add_argument('-e', '--epochs', type=int, default=30,
+    parser.add_argument('-e', '--epochs', type=int, default=150,
                         help='choose epochs to train with')
     parser.add_argument('--n_training_iterations', type=float, default=.5,
                         help='choose percentage of samples in each epoch to train with')
@@ -159,11 +152,10 @@ def main():
     cfg = read_py_config(args.config)
 
     # translate output to log file
-    if args.store_log:
+    if args.disable_store_log:
         log_name = 'optuna.log'
         log_name += time.strftime('-%Y-%m-%d-%H-%M-%S')
         sys.stdout = Logger(osp.join(cfg.output_dir, log_name))
-    print(cfg.utils.random_seeds)
     set_random_seed(cfg.utils.random_seeds)
 
     study = optuna.create_study(study_name='regression task', direction="minimize")

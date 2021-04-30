@@ -1,7 +1,4 @@
-import argparse
-
 import torch
-from icecream import ic
 import torch.nn as nn
 import torch.nn.functional as F
 from efficientnet_lite_pytorch import EfficientNet
@@ -24,7 +21,7 @@ EFFICIENT_NET_WEIGHTS = {
                          'efficientnet-lite2' : EfficientnetLite2ModelFile.get_model_file_path()
                          }
 
-def build_model(config, export_mode=False):
+def build_model(config, export_mode=False, weights_path=''):
     assert config.model.name in __AVAI_MODELS__, f"Wrong model name parameter. Expected one of {__AVAI_MODELS__}"
 
     if config.model.name.startswith('efficientnet'):
@@ -36,28 +33,30 @@ def build_model(config, export_mode=False):
                              blocks_args=blocks_args,
                              global_params=global_params)
 
-        if config.model.pretrained and not export_mode:
-            load_pretrained_weights(model, weights_path)
         if config.model.load_weights:
             load_pretrained_weights(model, config.model.load_weights)
+        elif config.model.pretrained and not export_mode:
+            load_pretrained_weights(model, weights_path)
 
     elif config.model.name == 'mobilenetv3_large':
         params = model_params['mobilenetv3_large']
         model = model_wraper(model_class=MobileNetV3, output_channels=1280,
                                 num_classes=config.model.num_classes, export_mode=export_mode, **params)
-        if config.model.pretrained and not export_mode:
-            init_pretrained_weights(model, key='mobilenetv3_large')
+
         if config.model.load_weights:
             load_pretrained_weights(model, config.model.load_weights)
+        elif config.model.pretrained and not export_mode:
+            init_pretrained_weights(model, key='mobilenetv3_large')
 
     elif config.model.name == 'mobilenetv3_small':
         params = model_params['mobilenetv3_small']
         model = model_wraper(model_class=MobileNetV3, output_channels=1024,
                                 num_classes=config.model.num_classes, export_mode=export_mode, **params)
-        if config.model.pretrained and not export_mode:
-            init_pretrained_weights(model, key='mobilenetv3_small')
+
         if config.model.load_weights:
             load_pretrained_weights(model, config.model.load_weights)
+        elif config.model.pretrained and not export_mode:
+            init_pretrained_weights(model, key='mobilenetv3_small')
 
     return model
 
@@ -70,7 +69,7 @@ def model_wraper(model_class, output_channels, num_points=18,
             self.regressors = nn.ModuleList()
             for _ in range(max_classes):
                 self.regressors.append(self._init_regressors(output_channel))
-            self.classifier = nn.Sequential(
+            self.cls_fc = nn.Sequential(
                 nn.Dropout(0.5),
                 nn.Linear(output_channel, num_classes),
             )
@@ -78,8 +77,10 @@ def model_wraper(model_class, output_channels, num_points=18,
             self.sigmoid = nn.Sigmoid()
 
         @staticmethod
-        def _init_regressors(output_channel):
-            return nn.Linear(output_channel, num_points)
+        def _init_regressors(output_channel=1280):
+            return nn.Sequential(
+                nn.Linear(output_channel, num_points),
+            )
 
         @staticmethod
         def _glob_feature_vector(x, mode, reduce_dims=True):
@@ -103,43 +104,38 @@ def model_wraper(model_class, output_channels, num_points=18,
                 choose according head for this '''
             features = self.extract_features(x)
             pooled_features = self._glob_feature_vector(features, mode=pooling_mode)
+            if model_class is MobileNetV3:
+                pooled_features = self.classifier(pooled_features)
             predicted_output = list()
             for reg in self.regressors:
                 predicted_output.append(reg(pooled_features).view(1, x.size(0), num_points // 2, 2))
             predicted_output = self.sigmoid(torch.cat(predicted_output))
-            # predicted_targets = self.classifier(pooled_features) if num_classes > 1 else torch.zeros(x.size(0))
-            # return (predicted_output, predicted_targets)
-            return predicted_output
+            predicted_targets = self.classifier(pooled_features) if num_classes > 1 else torch.zeros(x.size(0))
+            return predicted_output, predicted_targets
 
         def forward(self, x, cats):
             ''' ordinary forward for training '''
             features = self.extract_features(x)
             pooled_features = self._glob_feature_vector(features, mode=pooling_mode)
-            kp = torch.cat([self.regressors[id_](sample) for id_, sample in zip(cats, pooled_features)], 0)
+            if model_class is MobileNetV3:
+                pooled_features = self.classifier(pooled_features)
+            # unique_cats = torch.unique(cats)
+            # separated_features = [pooled_features[cats==cls] for cls in unique_cats]
+            # assert len(separated_features) == len(unique_cats)
+            # kp = torch.cat([self.regressors[c](minibatch) for c, minibatch in
+            #                         zip(unique_cats, separated_features)])
+            kp = torch.cat([self.regressors[c](sample) for c, sample in zip(cats, pooled_features)])
             kp = self.sigmoid(kp)
+            kp = kp.view(x.size(0), num_points // 2, 2)
+            # kp = kp[torch.randperm(kp.size(0))] # shuffle data
             if num_classes > 1:
-                targets = self.classifier(pooled_features)
+                targets = self.cls_fc(pooled_features)
             else:
                 targets = cats.unsqueeze(dim=1)
 
-            return (kp.view(x.size(0), num_points // 2, 2), targets)
+            return kp, targets
 
     model = ModelWrapper(**kwargs)
     if export_mode:
         model.forward = model.forward_to_onnx
     return model
-
-def test(config):
-    model = build_model(config)
-    img = torch.rand(128,3,224,224)
-    cats = torch.randint(0,5,(128,))
-    out = model(img, cats)
-    ic(out[0].shape, out[1].shape)
-
-if __name__ == "__main__":
-    from torchdet3d.utils import read_py_config
-    parser = argparse.ArgumentParser(description='3D-object-detection training')
-    parser.add_argument('--config', type=str, default='./configs/debug_config.py', help='path to config')
-    args = parser.parse_args()
-    cfg = read_py_config(args.config)
-    test(cfg)

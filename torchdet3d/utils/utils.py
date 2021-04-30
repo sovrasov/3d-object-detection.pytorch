@@ -8,6 +8,7 @@ import warnings
 from collections import OrderedDict
 from functools import partial
 from importlib import import_module
+from pprint import pformat
 
 import numpy as np
 import cv2 as cv
@@ -16,6 +17,7 @@ import torch
 from addict import Dict as adict
 
 from objectron.dataset import graphics
+#pylint: disable = consider-using-with
 
 OBJECTRON_CLASSES = ('bike', 'book', 'bottle', 'cereal_box', 'camera', 'chair', 'cup', 'laptop', 'shoe')
 
@@ -51,7 +53,7 @@ def mkdir_if_missing(dirname):
             if e.errno != errno.EEXIST:
                 raise
 
-def save_snap(model, optimizer, epoch, log_path):
+def save_snap(model, optimizer, scheduler, epoch, log_path):
     checkpoint = {'state_dict': model.state_dict(),
                   'optimizer': optimizer.state_dict(),
                   'epoch': epoch}
@@ -81,21 +83,14 @@ def read_py_config(filename):
     return cfg_dict
 
 def load_checkpoint(fpath):
-    r"""Loads checkpoint.
+    r"""Loads checkpoint. Imported from openvinotoolkit/deep-object-reid.
 
-    ``UnicodeDecodeError`` can be well handled, which means
-    python2-saved files can be read from python3.
 
     Args:
         fpath (str): path to checkpoint.
 
     Returns:
         dict
-
-    Examples::
-        >>> from torchreid.utils import load_checkpoint
-        >>> fpath = 'log/my_model/model.pth.tar-10'
-        >>> checkpoint = load_checkpoint(fpath)
     """
     if fpath is None:
         raise ValueError('File path is None')
@@ -115,7 +110,20 @@ def load_checkpoint(fpath):
         raise
     return checkpoint
 
-def load_pretrained_weights(model, file_path='', pretrained_dict=None, resume=False, parallel_model=False):
+def _print_loading_weights_inconsistencies(discarded_layers, unmatched_layers):
+    if discarded_layers:
+        print(
+            '** The following layers are discarded '
+            'due to unmatched keys or layer size: {}'.
+            format(pformat(discarded_layers))
+        )
+    if unmatched_layers:
+        print(
+            '** The following layers were not loaded from checkpoint: {}'.
+            format(pformat(unmatched_layers))
+        )
+
+def load_pretrained_weights(model, file_path='', pretrained_dict=None):
     r"""Loads pretrianed weights to model. Imported from openvinotoolkit/deep-object-reid.
     Features::
         - Incompatible layers (unmatched in name or size) will be ignored.
@@ -123,11 +131,13 @@ def load_pretrained_weights(model, file_path='', pretrained_dict=None, resume=Fa
     Args:
         model (nn.Module): network model.
         file_path (str): path to pretrained weights.
-    Examples::
-        >>> from torchreid.utils import load_pretrained_weights
-        >>> file_path = 'log/my_model/model-best.pth.tar'
-        >>> load_pretrained_weights(model, file_path)
     """
+    def _remove_prefix(key, prefix):
+        prefix = prefix + '.'
+        if key.startswith(prefix):
+            key = key[len(prefix):]
+        return key
+
     if file_path:
         check_isfile(file_path)
     checkpoint = (load_checkpoint(file_path)
@@ -142,12 +152,10 @@ def load_pretrained_weights(model, file_path='', pretrained_dict=None, resume=Fa
     model_dict = model.state_dict()
     new_state_dict = OrderedDict()
     matched_layers, discarded_layers = [], []
+
     for k, v in state_dict.items():
-        if (k.startswith('module.') and
-            not resume and
-            not parallel_model):
-            # discard module.
-            k = k[7:]
+        k = _remove_prefix(k, 'module')
+
         if k in model_dict and model_dict[k].size() == v.size():
             new_state_dict[k] = v
             matched_layers.append(k)
@@ -157,23 +165,46 @@ def load_pretrained_weights(model, file_path='', pretrained_dict=None, resume=Fa
     model_dict.update(new_state_dict)
     model.load_state_dict(model_dict)
 
+    message = file_path if file_path else "pretrained dict"
+    unmatched_layers = sorted(set(model_dict.keys()) - set(new_state_dict))
     if len(matched_layers) == 0:
-        warnings.warn(
-            'The pretrained weights "{}" cannot be loaded, '
-            'please check the key names manually '
-            '(** ignored and continue **)'.format(file_path)
-        )
-    else:
         print(
-            'Successfully loaded pretrained weights from "{}"'.
-            format(file_path)
+            'The pretrained weights "{}" cannot be loaded, '
+            'please check the key names manually'.format(message)
         )
-        if len(discarded_layers) > 0:
-            print(
-                '** The following layers are discarded '
-                'due to unmatched keys or layer size: {}'.
-                format(discarded_layers)
-            )
+        _print_loading_weights_inconsistencies(discarded_layers, unmatched_layers)
+
+        raise RuntimeError(f'The pretrained weights {message} cannot be loaded')
+    print(
+        'Successfully loaded pretrained weights from "{}"'.
+        format(message)
+    )
+    _print_loading_weights_inconsistencies(discarded_layers, unmatched_layers)
+
+def resume_from(model, chkpt_path, optimizer=None, scheduler=None):
+    print(f'Loading checkpoint from "{chkpt_path}"')
+    checkpoint = load_checkpoint(chkpt_path)
+    if 'state_dict' in checkpoint:
+        load_pretrained_weights(model, pretrained_dict=checkpoint['state_dict'])
+    else:
+        load_pretrained_weights(model, pretrained_dict=checkpoint)
+    print('Loaded model weights')
+    if optimizer is not None and 'optimizer' in checkpoint.keys():
+        optimizer.load_state_dict(checkpoint['optimizer'])
+        print('Loaded optimizer')
+    if scheduler is not None and 'scheduler' in checkpoint.keys():
+        scheduler.load_state_dict(checkpoint['scheduler'])
+        print('Loaded scheduler')
+    if 'epoch' in checkpoint:
+        # since saved in the end of an epoch we increment it by 1
+        start_epoch = checkpoint['epoch'] + 1
+    else:
+        start_epoch = 0
+        print("Warning. The epoch has not been restored.")
+    print('Last epoch = {}'.format(start_epoch))
+    if 'rank1' in checkpoint.keys():
+        print('Last rank1 = {:.1%}'.format(checkpoint['rank1']))
+    return start_epoch
 
 def unnormalize_img(img,
                 mean=[0.5931, 0.4690, 0.4229],

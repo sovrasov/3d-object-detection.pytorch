@@ -11,7 +11,7 @@ from torchdet3d.builders import (build_loader, build_model, build_loss,
 from torchdet3d.evaluation import Evaluator
 from torchdet3d.losses import LossManager
 from torchdet3d.trainer import Trainer
-from torchdet3d.utils import read_py_config, Logger, set_random_seed
+from torchdet3d.utils import read_py_config, Logger, set_random_seed, check_isfile, resume_from
 
 def reset_config(cfg, args):
     if args.root:
@@ -24,8 +24,8 @@ def main():
     parser.add_argument('--config', type=str, default='./configs/default_config.py', help='path to config')
     parser.add_argument('--device', type=str, default='cuda', choices=['cuda','cpu'],
                         help='choose device to train on')
-    parser.add_argument('--save_checkpoint', type=bool, default=True,
-                        help='whether or not to save your model')
+    parser.add_argument('--wo_saving_checkpoint', action="store_false",
+                            help='if switched on -- the chkpt will not be saved')
     args = parser.parse_args()
     cfg = read_py_config(args.config)
     reset_config(cfg, args)
@@ -39,29 +39,41 @@ def main():
     net = build_model(cfg)
     # TO DO resume from chkpt opportunity
     net.to(args.device)
-    if (torch.cuda.is_available() and args.device == 'cuda' and cfg.data_parallel.use_parallel):
-        net = torch.nn.DataParallel(net, **cfg.data_parallel.parallel_params)
 
-    criterions = build_loss(cfg)
     optimizer = build_optimizer(cfg, net)
     scheduler = build_scheduler(cfg, optimizer)
+
+    if cfg.model.resume:
+        if check_isfile(cfg.model.resume):
+            start_epoch = resume_from(net, cfg.model.resume, optimizer=optimizer, scheduler=None)
+        else:
+            raise RuntimeError("the checkpoint isn't found ot can't be loaded!")
+    else:
+        start_epoch = 0
+
+    if (torch.cuda.is_available() and args.device == 'cuda' and cfg.data_parallel.use_parallel):
+        net = torch.nn.DataParallel(net, **cfg.data_parallel.parallel_params)
+    criterions = build_loss(cfg)
     loss_manager = LossManager(criterions, cfg.loss.coeffs, cfg.loss.alwa)
     train_loader, val_loader, test_loader = build_loader(cfg)
     writer = SummaryWriter(cfg.output_dir)
+    train_step = (start_epoch - 1)*len(train_loader) if start_epoch > 1 else 0
 
     trainer = Trainer(model=net,
                       train_loader=train_loader,
                       optimizer=optimizer,
+                      scheduler=scheduler,
                       loss_manager=loss_manager,
                       writer=writer,
                       max_epoch=cfg.data.max_epochs,
                       log_path=cfg.output_dir,
                       device=args.device,
-                      save_chkpt=args.save_checkpoint,
+                      save_chkpt=args.wo_saving_checkpoint,
                       debug=cfg.utils.debug_mode,
                       debug_steps=cfg.utils.debug_steps,
                       save_freq=cfg.utils.save_freq,
-                      print_freq=cfg.utils.print_freq)
+                      print_freq=cfg.utils.print_freq,
+                      train_step=train_step)
 
     evaluator = Evaluator(model=net,
                           val_loader=val_loader,
@@ -72,16 +84,17 @@ def main():
                           max_epoch=cfg.data.max_epochs,
                           path_to_save_imgs=cfg.output_dir,
                           debug=cfg.utils.debug_mode,
-                          debug_steps=cfg.utils.debug_steps)
+                          debug_steps=cfg.utils.debug_steps,
+                          val_step=start_epoch)
     # main loop
     if cfg.regime.type == "evaluation":
         evaluator.run_eval_pipe(cfg.regime.vis_only)
     else:
         assert cfg.regime.type == "training"
-        for epoch in range(cfg.data.max_epochs):
+        if cfg.model.resume:
+            evaluator.val()
+        for epoch in range(start_epoch, cfg.data.max_epochs):
             trainer.train(epoch)
-            if scheduler is not None:
-                scheduler.step()
             evaluator.val(epoch)
         evaluator.visual_test()
 
