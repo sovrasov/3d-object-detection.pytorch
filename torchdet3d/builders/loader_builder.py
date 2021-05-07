@@ -37,6 +37,7 @@ def build_augmentations(cfg):
 
     train_transform = A.Compose([
                             ConvertColor(),
+                            A.RandomScale(scale_limit=(0.8, 0.95), p=0.4),
                             A.Resize(*cfg.data.resize),
                             A.HorizontalFlip(p=0.35),
                             # A.Rotate(limit=30, p=0.3),
@@ -48,7 +49,6 @@ def build_augmentations(cfg):
                                     ], p=1),
                             A.Blur(blur_limit=5, p=0.15),
                             # A.IAAPiecewiseAffine(p=0.3),
-                            A.RandomScale(scale_limit=(0.8, 0.95), p=0.4),
                             normalize,
                             ToTensor(cfg.data.resize)
                             ], keypoint_params=A.KeypointParams(format='xy', remove_invisible=False))
