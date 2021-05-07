@@ -3,7 +3,7 @@ import albumentations as A
 import numpy as np
 
 from torchdet3d.dataloaders import Objectron
-from torchdet3d.utils import ConvertColor, ToTensor
+from torchdet3d.utils import ConvertColor, ToTensor, RandomRescale
 
 def worker_init_fn(worker_id):
     np.random.seed(np.random.get_state()[1][0] + worker_id)
@@ -37,7 +37,7 @@ def build_augmentations(cfg):
 
     train_transform = A.Compose([
                             ConvertColor(),
-                            A.RandomScale(scale_limit=(0.8, 0.95), p=0.4),
+                            RandomRescale(scale_limit=(0.8, 0.95), p=0.4),
                             A.Resize(*cfg.data.resize),
                             A.HorizontalFlip(p=0.35),
                             # A.Rotate(limit=30, p=0.3),

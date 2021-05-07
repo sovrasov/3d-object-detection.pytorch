@@ -1,7 +1,8 @@
+import random
 import cv2 as cv
 import numpy as np
 import torch
-from albumentations.core.transforms_interface import BasicTransform, ImageOnlyTransform
+from albumentations.core.transforms_interface import BasicTransform, ImageOnlyTransform, DualTransform, to_tuple
 
 from .utils import normalize
 
@@ -13,6 +14,37 @@ class ConvertColor(ImageOnlyTransform):
 
     def apply(self, img, **params):
         return cv.cvtColor(img, cv.COLOR_BGR2RGB)
+
+
+class RandomRescale(DualTransform):
+    """Rescaling image and keypoints
+    """
+    def __init__(self, scale_limit=0.1, interpolation=cv.INTER_LINEAR, always_apply=False, p=0.5):
+        super().__init__(always_apply=always_apply, p=p)
+        self.scale_limit = to_tuple(scale_limit, bias=0)
+        self.interpolation = interpolation
+
+    def get_params(self):
+        return {"scale": random.uniform(self.scale_limit[0], self.scale_limit[1])}
+
+    def apply(self, img, scale=0, interpolation=cv.INTER_LINEAR, **params):
+        h, w = img.shape[:2]
+        rot_mat = cv.getRotationMatrix2D((w*0.5, h*0.5), 0, scale)
+        image = cv.warpAffine(img, rot_mat, (w, h), flags=cv.INTER_LINEAR)
+        return image
+
+    def apply_to_bbox(self, bbox, scale=0, **params):
+        pass
+
+    def apply_to_keypoint(self, keypoint, scale=0, cols=0, rows=0, **params):
+        x, y, angle, s = keypoint[:4]
+        rot_mat_l = cv.getRotationMatrix2D((0.5*cols, 0.5*rows), 0, scale)
+        new_keypoint = cv.transform(np.array([x, y]).reshape(1, 1, 2), rot_mat_l).reshape(-1)
+        return new_keypoint[0], new_keypoint[1], angle, s * scale
+
+    def get_transform_init_args(self):
+        return {"interpolation": self.interpolation, "scale_limit": to_tuple(self.scale_limit, bias=-1.0)}
+
 
 class ToTensor(BasicTransform):
     """Converting color of the image
