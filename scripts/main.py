@@ -84,8 +84,7 @@ def main():
                           max_epoch=cfg.data.max_epochs,
                           path_to_save_imgs=cfg.output_dir,
                           debug=cfg.utils.debug_mode,
-                          debug_steps=cfg.utils.debug_steps,
-                          val_step=start_epoch)
+                          debug_steps=cfg.utils.debug_steps)
     # main loop
     if cfg.regime.type == "evaluation":
         evaluator.run_eval_pipe(cfg.regime.vis_only)
