@@ -26,7 +26,6 @@ class Evaluator:
     path_to_save_imgs: str = './testing_images'
     debug: bool = False
     debug_steps: int = 30
-    val_step: int = 0
 
     def visual_test(self):
         _, test_transform = build_augmentations(self.cfg)
@@ -117,11 +116,11 @@ class Evaluator:
 
         if epoch is not None:
             # write to writer for tensorboard
-            self.writer.add_scalar('Val/ADD', ADD_meter.avg, global_step=self.val_step)
-            self.writer.add_scalar('Val/SADD', SADD_meter.avg, global_step=self.val_step)
-            self.writer.add_scalar('Val/ACC', ACC_meter.avg, global_step=self.val_step)
-            self.writer.add_scalar('Val/IOU', IOU_meter.avg, global_step=self.val_step)
-            self.val_step += 1
+            self.writer.add_scalar('Val/ADD', ADD_meter.avg, global_step=epoch)
+            self.writer.add_scalar('Val/SADD', SADD_meter.avg, global_step=epoch)
+            self.writer.add_scalar('Val/ACC', ACC_meter.avg, global_step=epoch)
+            self.writer.add_scalar('Val/IOU', IOU_meter.avg, global_step=epoch)
+
         t = PrettyTable(['category name', 'ADD', 'SADD', 'IOU', 'accuracy'], float_format=".4")
         t.add_row(["Average metrics",
                     ADD_meter.avg,

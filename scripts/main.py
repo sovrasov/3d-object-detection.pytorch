@@ -95,7 +95,8 @@ def main():
             evaluator.val()
         for epoch in range(start_epoch, cfg.data.max_epochs):
             trainer.train(epoch)
-            evaluator.val(epoch)
+            if epoch % cfg.utils.eval_freq == 0:
+                evaluator.val(epoch)
         evaluator.visual_test()
 
 
