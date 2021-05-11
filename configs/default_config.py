@@ -27,3 +27,24 @@ output_dir = './output/log'
 utils = dict(debug_mode=False, random_seeds=5, save_freq=10, print_freq=20, debug_steps=100)
 
 regime = dict(type='training', vis_only=False)
+
+train_data_pipeline = [('convert_color', dict()),
+                       #('random_rescale', dict(scale_limit=(0.8, 0.95), p=0.4)),
+                       ('resize', dict(height=data['resize'][0], width=data['resize'][1])),
+                       ('horizontal_flip', dict(p=0.35)),
+                       ('one_of', dict(p=1, transforms=
+                            [
+                                ('hue_saturation_value', dict(p=0.3)),
+                                ('rgb_shift', dict(p=0.3)),
+                                ('random_brightness_contrast', dict(p=0.3)),
+                                ('color_jitter', dict(p=0.3)),
+                            ]
+                       )),
+                       ('blur', dict(blur_limit=5, p=0.15)),
+                       ('normalize', data['normalization']),
+                       ('to_tensor', dict(img_shape=data['resize']))]
+
+test_data_pipeline = [('convert_color', dict()),
+                      ('resize', dict(height=data['resize'][0], width=data['resize'][1])),
+                      ('normalize', data['normalization']),
+                      ('to_tensor', dict(img_shape=data['resize']))]
