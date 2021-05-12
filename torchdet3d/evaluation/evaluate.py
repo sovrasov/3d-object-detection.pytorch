@@ -5,7 +5,7 @@ from prettytable import PrettyTable
 from tqdm import tqdm
 from copy import deepcopy
 
-from .metrics import compute_accuracy, compute_average_distance, compute_metrics_per_cls, compute_2d_based_iou
+from .metrics import compute_accuracy, compute_average_distance, compute_metrics_per_cls
 from torchdet3d.utils import (AverageMeter, mkdir_if_missing, draw_kp, OBJECTRON_CLASSES)
 from torchdet3d.builders import build_augmentations
 from torchdet3d.dataloaders import Objectron

@@ -39,7 +39,7 @@ class RandomRescale(DualTransform):
     def apply_to_keypoint(self, keypoint, scale=0, cols=0, rows=0, **params):
         x, y, angle, s = keypoint[:4]
         rot_mat_l = cv.getRotationMatrix2D((0.5*cols, 0.5*rows), 0, scale)
-        new_keypoint = cv.transform(np.array([x, y]).reshape(1, 1, 2), rot_mat_l).reshape(-1)
+        new_keypoint = cv.transform(np.array([x, y]).reshape((1, 1, 2)), rot_mat_l).reshape(-1)
         return new_keypoint[0], new_keypoint[1], angle, s * scale
 
     def get_transform_init_args(self):
