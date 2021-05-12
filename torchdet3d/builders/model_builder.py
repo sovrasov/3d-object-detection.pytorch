@@ -7,6 +7,7 @@ from efficientnet_lite0_pytorch_model import EfficientnetLite0ModelFile
 from efficientnet_lite1_pytorch_model import EfficientnetLite1ModelFile
 from efficientnet_lite2_pytorch_model import EfficientnetLite2ModelFile
 
+from torchdet3d.models.mobilenetv3_timm import MobileNetV3_large_100
 from torchdet3d.models import MobileNetV3, init_pretrained_weights, model_params
 from torchdet3d.utils import load_pretrained_weights
 
@@ -27,7 +28,7 @@ def build_model(config, export_mode=False, weights_path=''):
     if config.model.name.startswith('efficientnet'):
         weights_path = EFFICIENT_NET_WEIGHTS[config.model.name]
         blocks_args, global_params = get_model_params(config.model.name, override_params=None)
-        model = model_wraper(model_class=EfficientNet,
+        model = model_wrapper(model_class=EfficientNet,
                              output_channels=1280,
                              num_classes=config.model.num_classes,
                              blocks_args=blocks_args,
@@ -39,37 +40,37 @@ def build_model(config, export_mode=False, weights_path=''):
             load_pretrained_weights(model, weights_path)
 
     elif config.model.name == 'mobilenetv3_large':
-        params = model_params['mobilenetv3_large']
-        model = model_wraper(model_class=MobileNetV3, output_channels=1280,
+        params = model_params[config.model.name]
+        model = model_wrapper(model_class=MobileNetV3, output_channels=1280,
                                 num_classes=config.model.num_classes, export_mode=export_mode, **params)
 
         if config.model.load_weights:
             load_pretrained_weights(model, config.model.load_weights)
         elif config.model.pretrained and not export_mode:
-            init_pretrained_weights(model, key='mobilenetv3_large')
+            init_pretrained_weights(model, key=config.model.name)
 
     elif config.model.name == 'mobilenetv3_small':
-        params = model_params['mobilenetv3_small']
-        model = model_wraper(model_class=MobileNetV3, output_channels=1024,
+        params = model_params[config.model.name]
+        model = model_wrapper(model_class=MobileNetV3, output_channels=1024,
                                 num_classes=config.model.num_classes, export_mode=export_mode, **params)
 
         if config.model.load_weights:
             load_pretrained_weights(model, config.model.load_weights)
         elif config.model.pretrained and not export_mode:
-            init_pretrained_weights(model, key='mobilenetv3_small')
+            init_pretrained_weights(model, key=config.model.name)
 
     elif config.model.name == 'mobilenetv3_large_21k':
-        assert config.model.pretrained == False
-        from torchdet3d.models.mobilenetv3_timm import MobileNetV3_large_100
-        model = model_wraper(model_class=MobileNetV3_large_100, output_channels=1280,
+        model = model_wrapper(model_class=MobileNetV3_large_100, output_channels=1280,
                              num_classes=config.model.num_classes, export_mode=export_mode)
 
         if config.model.load_weights:
             load_pretrained_weights(model, config.model.load_weights, extra_prefix='model.')
+        elif config.model.pretrained and not export_mode:
+            init_pretrained_weights(model, key=config.model.name, extra_prefix='model.')
 
     return model
 
-def model_wraper(model_class, output_channels, num_points=18,
+def model_wrapper(model_class, output_channels, num_points=18,
                     num_classes=1, pooling_mode='avg', export_mode=False, **kwargs):
     class ModelWrapper(model_class):
         def __init__(self, output_channel=output_channels, **kwargs):
