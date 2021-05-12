@@ -90,11 +90,8 @@ class Evaluator:
             # compute output and loss
             pred_kp, pred_cats = self.model(imgs, gt_cats)
             # measure metrics
-            ADD, SADD = compute_average_distance(pred_kp, gt_kp)
-            IOU = compute_2d_based_iou(pred_kp, gt_kp)
-            ACC = compute_accuracy(pred_cats, gt_cats)
-
-            for cl, ADD_cls, SADD_cls, IOU_cls, ACC_cls in compute_metrics_per_cls(pred_kp, gt_kp, pred_cats, gt_cats):
+            per_class_metrics, ADD, SADD, IOU, ACC = compute_metrics_per_cls(pred_kp, gt_kp, pred_cats, gt_cats)
+            for cl, ADD_cls, SADD_cls, IOU_cls, ACC_cls in per_class_metrics:
                 ADD_cls_meter[cl].update(ADD_cls, imgs.size(0))
                 SADD_cls_meter[cl].update(SADD_cls, imgs.size(0))
                 ACC_cls_meter[cl].update(ACC_cls, imgs.size(0))
