@@ -64,7 +64,7 @@ def build_model(config, export_mode=False, weights_path=''):
                              num_classes=config.model.num_classes, export_mode=export_mode)
 
         if config.model.load_weights:
-            load_pretrained_weights(model, config.model.load_weights, extra_prefix='model.')
+            load_pretrained_weights(model, config.model.load_weights)
         elif config.model.pretrained and not export_mode:
             init_pretrained_weights(model, key=config.model.name, extra_prefix='model.')
 
