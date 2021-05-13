@@ -1,12 +1,15 @@
+import random
+
 from torch.utils.data import DataLoader
 import albumentations as A
 import numpy as np
 
 from torchdet3d.dataloaders import Objectron
-from torchdet3d.utils import ConvertColor, ToTensor, RandomRescale
+from torchdet3d.utils import ConvertColor, ToTensor, RandomRescale, RandomRotate
 
 def worker_init_fn(worker_id):
     np.random.seed(np.random.get_state()[1][0] + worker_id)
+    random.seed(random.getstate()[1][0] + worker_id + 1)
 
 def build_loader(config, mode='train'):
 
@@ -44,7 +47,8 @@ TRANSFORMS_REGISTRY = {
         'blur': A.Blur,
         'normalize': A.augmentations.transforms.Normalize,
         'to_tensor': ToTensor,
-        'one_of': A.OneOf
+        'one_of': A.OneOf,
+        'random_rotate': RandomRotate,
     }
 
 def build_transforms_list(transforms_config):
