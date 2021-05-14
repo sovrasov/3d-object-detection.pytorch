@@ -120,7 +120,7 @@ def model_wrapper(model_class, output_channels, num_points=18,
             for reg in self.regressors:
                 predicted_output.append(reg(pooled_features).view(1, x.size(0), num_points // 2, 2))
             predicted_output = self.sigmoid(torch.cat(predicted_output))
-            predicted_targets = self.classifier(pooled_features) if num_classes > 1 else torch.zeros(x.size(0))
+            predicted_targets = self.cls_fc(pooled_features) if num_classes > 1 else torch.zeros(x.size(0))
             return predicted_output, predicted_targets
 
         def forward(self, x, cats):
