@@ -56,7 +56,7 @@ def mkdir_if_missing(dirname):
 def save_snap(model, optimizer, scheduler, epoch, log_path):
     checkpoint = {'state_dict': model.state_dict(),
                   'optimizer': optimizer.state_dict(),
-                  'scheduler': scheduler.state_dict(),
+                  'scheduler': optimizer.state_dict(),
                   'epoch': epoch}
 
     snap_name = f'{log_path}/snap_{epoch}.pth'
