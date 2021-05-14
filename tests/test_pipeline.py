@@ -1,7 +1,6 @@
 import torch
 
-from torchdet3d.evaluation import (compute_average_distance, compute_metrics_per_cls,
-                                    compute_2d_based_iou, compute_accuracy)
+from torchdet3d.evaluation import compute_metrics_per_cls
 
 from torchdet3d.losses import WingLoss, ADD_loss, DiagLoss
 from torchdet3d.builders import (build_loss, build_optimizer, build_scheduler,
@@ -17,12 +16,10 @@ class TestCasesPipeline:
     config = read_py_config("./configs/default_config.py")
 
     def test_metrics(self):
-        ADD, SADD = compute_average_distance(self.test_kps, self.gt_kps)
-        metrics = compute_metrics_per_cls(self.test_kps, self.gt_kps, self.test_cats, self.gt_cats)
-        IOU = compute_2d_based_iou(self.test_kps, self.gt_kps)
-        acc = compute_accuracy(self.test_cats, self.gt_cats)
+        cls_metrics, ADD, SADD, IOU, acc = compute_metrics_per_cls(self.test_kps, self.gt_kps,
+                                                                   self.test_cats, self.gt_cats)
         assert 0 <= ADD <= 1 and 0 <= SADD <= 1 and 0 <= IOU <= 1 and 0 <= acc <= 1
-        assert len(metrics) == 9 and len(metrics[0]) == 5
+        assert len(cls_metrics) == 9 and len(cls_metrics[0]) == 5
 
     def test_losses(self):
         for loss in [WingLoss(), ADD_loss(), DiagLoss()]:

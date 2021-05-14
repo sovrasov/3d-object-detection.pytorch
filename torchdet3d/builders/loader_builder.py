@@ -1,12 +1,15 @@
+import random
+
 from torch.utils.data import DataLoader
 import albumentations as A
 import numpy as np
 
 from torchdet3d.dataloaders import Objectron
-from torchdet3d.utils import ConvertColor, ToTensor
+from torchdet3d.utils import ConvertColor, ToTensor, RandomRescale, RandomRotate
 
 def worker_init_fn(worker_id):
     np.random.seed(np.random.get_state()[1][0] + worker_id)
+    random.seed(random.getstate()[1][0] + worker_id + 1)
 
 def build_loader(config, mode='train'):
 
@@ -32,31 +35,34 @@ def build_loader(config, mode='train'):
 
     return train_loader, val_loader, test_loader
 
+TRANSFORMS_REGISTRY = {
+        'convert_color': ConvertColor,
+        'random_rescale': RandomRescale,
+        'resize': A.Resize,
+        'horizontal_flip': A.HorizontalFlip,
+        'hue_saturation_value': A.HueSaturationValue,
+        'rgb_shift': A.RGBShift,
+        'random_brightness_contrast': A.RandomBrightnessContrast,
+        'color_jitter': A.ColorJitter,
+        'blur': A.Blur,
+        'normalize': A.augmentations.transforms.Normalize,
+        'to_tensor': ToTensor,
+        'one_of': A.OneOf,
+        'random_rotate': RandomRotate,
+    }
+
+def build_transforms_list(transforms_config):
+    transforms = []
+    for t, args in transforms_config:
+        if t == 'one_of':
+            transforms.append(TRANSFORMS_REGISTRY[t](build_transforms_list(args.transforms), p=args.p))
+        else:
+            transforms.append(TRANSFORMS_REGISTRY[t](**args))
+    return transforms
+
 def build_augmentations(cfg):
-    normalize = A.augmentations.transforms.Normalize (**cfg.data.normalization)
-
-    train_transform = A.Compose([
-                            ConvertColor(),
-                            A.Resize(*cfg.data.resize),
-                            A.HorizontalFlip(p=0.35),
-                            # A.Rotate(limit=30, p=0.3),
-                            A.OneOf([
-                                        A.HueSaturationValue(p=0.3),
-                                        A.RGBShift(p=0.3),
-                                        A.RandomBrightnessContrast(p=0.3),
-                                        A.ColorJitter(p=0.3),
-                                    ], p=1),
-                            A.Blur(blur_limit=5, p=0.15),
-                            # A.IAAPiecewiseAffine(p=0.3),
-                            normalize,
-                            ToTensor(cfg.data.resize)
-                            ], keypoint_params=A.KeypointParams(format='xy', remove_invisible=False))
-
-    test_transform = A.Compose([
-                            ConvertColor(),
-                            A.Resize(*cfg.data.resize),
-                            normalize,
-                            ToTensor(cfg.data.resize)
-                            ], keypoint_params=A.KeypointParams(format='xy', remove_invisible=False))
-
+    train_transform = A.Compose(build_transforms_list(cfg.train_data_pipeline),
+                                keypoint_params=A.KeypointParams(format='xy', remove_invisible=False))
+    test_transform = A.Compose(build_transforms_list(cfg.test_data_pipeline),
+                                keypoint_params=A.KeypointParams(format='xy', remove_invisible=False))
     return train_transform, test_transform

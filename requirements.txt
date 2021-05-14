@@ -21,3 +21,4 @@ pylint
 isort
 pytest
 ptflops
+timm

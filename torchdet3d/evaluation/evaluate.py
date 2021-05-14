@@ -5,7 +5,7 @@ from prettytable import PrettyTable
 from tqdm import tqdm
 from copy import deepcopy
 
-from .metrics import compute_accuracy, compute_average_distance, compute_metrics_per_cls, compute_2d_based_iou
+from .metrics import compute_accuracy, compute_average_distance, compute_metrics_per_cls
 from torchdet3d.utils import (AverageMeter, mkdir_if_missing, draw_kp, OBJECTRON_CLASSES)
 from torchdet3d.builders import build_augmentations
 from torchdet3d.dataloaders import Objectron
@@ -26,7 +26,6 @@ class Evaluator:
     path_to_save_imgs: str = './testing_images'
     debug: bool = False
     debug_steps: int = 30
-    val_step: int = 0
 
     def visual_test(self):
         _, test_transform = build_augmentations(self.cfg)
@@ -91,11 +90,8 @@ class Evaluator:
             # compute output and loss
             pred_kp, pred_cats = self.model(imgs, gt_cats)
             # measure metrics
-            ADD, SADD = compute_average_distance(pred_kp, gt_kp)
-            IOU = compute_2d_based_iou(pred_kp, gt_kp)
-            ACC = compute_accuracy(pred_cats, gt_cats)
-
-            for cl, ADD_cls, SADD_cls, IOU_cls, ACC_cls in compute_metrics_per_cls(pred_kp, gt_kp, pred_cats, gt_cats):
+            per_class_metrics, ADD, SADD, IOU, ACC = compute_metrics_per_cls(pred_kp, gt_kp, pred_cats, gt_cats)
+            for cl, ADD_cls, SADD_cls, IOU_cls, ACC_cls in per_class_metrics:
                 ADD_cls_meter[cl].update(ADD_cls, imgs.size(0))
                 SADD_cls_meter[cl].update(SADD_cls, imgs.size(0))
                 ACC_cls_meter[cl].update(ACC_cls, imgs.size(0))
@@ -117,11 +113,11 @@ class Evaluator:
 
         if epoch is not None:
             # write to writer for tensorboard
-            self.writer.add_scalar('Val/ADD', ADD_meter.avg, global_step=self.val_step)
-            self.writer.add_scalar('Val/SADD', SADD_meter.avg, global_step=self.val_step)
-            self.writer.add_scalar('Val/ACC', ACC_meter.avg, global_step=self.val_step)
-            self.writer.add_scalar('Val/IOU', IOU_meter.avg, global_step=self.val_step)
-            self.val_step += 1
+            self.writer.add_scalar('Val/ADD', ADD_meter.avg, global_step=epoch)
+            self.writer.add_scalar('Val/SADD', SADD_meter.avg, global_step=epoch)
+            self.writer.add_scalar('Val/ACC', ACC_meter.avg, global_step=epoch)
+            self.writer.add_scalar('Val/IOU', IOU_meter.avg, global_step=epoch)
+
         t = PrettyTable(['category name', 'ADD', 'SADD', 'IOU', 'accuracy'], float_format=".4")
         t.add_row(["Average metrics",
                     ADD_meter.avg,

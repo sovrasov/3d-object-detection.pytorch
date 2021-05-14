@@ -1,17 +1,20 @@
 import math
 
 import torch.nn as nn
+from timm.models.mobilenetv3 import mobilenetv3_large_100
 
 from  torchdet3d.utils import load_pretrained_weights
 
 
-__all__ = ['MobileNetV3', 'init_pretrained_weights', 'model_params']
+__all__ = ['MobileNetV3', 'init_pretrained_weights', 'model_params', 'MobileNetV3_large_100_timm']
 
 pretrained_urls = {
     'mobilenetv3_small':
     'https://github.com/d-li14/mobilenetv3.pytorch/blob/master/pretrained/mobilenetv3-small-55df8e1f.pth?raw=true',
     'mobilenetv3_large':
     'https://github.com/d-li14/mobilenetv3.pytorch/blob/master/pretrained/mobilenetv3-large-1cd25616.pth?raw=true',
+    'mobilenetv3_large_21k':
+    'https://miil-public-eu.oss-eu-central-1.aliyuncs.com/model-zoo/ImageNet_21K_P/models/mobilenetv3_large_100_miil_21k.pth'
 }
 
 model_params = dict(
@@ -217,7 +220,18 @@ class MobileNetV3(nn.Module):
     def _init_fc(self, output_channel):
         return nn.Linear(output_channel, self.num_points)
 
-def init_pretrained_weights(model, key=''):
+
+class MobileNetV3_large_100_timm(nn.Module):
+    def __init__(self, pretrained=False):
+        super().__init__()
+        self.model = mobilenetv3_large_100(pretrained)
+        self.model.classifier = None
+
+    def extract_features(self, x):
+        return self.model.forward_features(x)
+
+
+def init_pretrained_weights(model, key='', **kwargs):
     """Initializes model with pretrained weights.
 
     Layers that don't match with pretrained layers in name or size are kept unchanged.
@@ -254,4 +268,4 @@ def init_pretrained_weights(model, key=''):
     if not os.path.exists(cached_file):
         gdown.download(pretrained_urls[key], cached_file)
 
-    load_pretrained_weights(model, cached_file)
+    load_pretrained_weights(model, cached_file, **kwargs)
