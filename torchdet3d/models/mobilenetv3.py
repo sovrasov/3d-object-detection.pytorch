@@ -1,11 +1,12 @@
 import math
 
 import torch.nn as nn
+from timm.models.mobilenetv3 import mobilenetv3_large_100
 
 from  torchdet3d.utils import load_pretrained_weights
 
 
-__all__ = ['MobileNetV3', 'init_pretrained_weights', 'model_params']
+__all__ = ['MobileNetV3', 'init_pretrained_weights', 'model_params', 'MobileNetV3_large_100_timm']
 
 pretrained_urls = {
     'mobilenetv3_small':
@@ -218,6 +219,17 @@ class MobileNetV3(nn.Module):
 
     def _init_fc(self, output_channel):
         return nn.Linear(output_channel, self.num_points)
+
+
+class MobileNetV3_large_100_timm(nn.Module):
+    def __init__(self, pretrained=False):
+        super().__init__()
+        self.model = mobilenetv3_large_100(pretrained)
+        self.model.classifier = None
+
+    def extract_features(self, x):
+        return self.model.forward_features(x)
+
 
 def init_pretrained_weights(model, key='', **kwargs):
     """Initializes model with pretrained weights.

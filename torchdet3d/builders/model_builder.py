@@ -7,8 +7,8 @@ from efficientnet_lite0_pytorch_model import EfficientnetLite0ModelFile
 from efficientnet_lite1_pytorch_model import EfficientnetLite1ModelFile
 from efficientnet_lite2_pytorch_model import EfficientnetLite2ModelFile
 
-from torchdet3d.models.mobilenetv3_timm import MobileNetV3_large_100
-from torchdet3d.models import MobileNetV3, init_pretrained_weights, model_params
+from torchdet3d.models import (MobileNetV3, init_pretrained_weights,
+                               model_params, MobileNetV3_large_100_timm)
 from torchdet3d.utils import load_pretrained_weights
 
 __AVAI_MODELS__ = {
@@ -60,7 +60,7 @@ def build_model(config, export_mode=False, weights_path=''):
             init_pretrained_weights(model, key=config.model.name)
 
     elif config.model.name == 'mobilenetv3_large_21k':
-        model = model_wrapper(model_class=MobileNetV3_large_100, output_channels=1280,
+        model = model_wrapper(model_class=MobileNetV3_large_100_timm, output_channels=1280,
                              num_classes=config.model.num_classes, export_mode=export_mode)
 
         if config.model.load_weights:
