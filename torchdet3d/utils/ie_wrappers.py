@@ -1,5 +1,3 @@
-import random
-from copy import deepcopy as copy
 from collections import namedtuple
 import queue
 
@@ -7,12 +5,7 @@ import cv2 as cv
 import glog as log
 import os
 import numpy as np
-import matplotlib.pyplot as plt
-import logging
-from tqdm import tqdm
 from scipy.optimize import linear_sum_assignment
-
-from objectron.dataset import box
 
 
 __all__ = ['Regressor', 'Detector', 'CameraTracker']
@@ -35,7 +28,7 @@ class IEModel:
     def forward(self, img):
         """Performs forward pass of the wrapped IE model"""
         res = self.net.infer(inputs={self.input_key: self._preprocess(img)})
-        return [res[key] for key in self.output_key]
+        return list(res.values())
 
     def forward_async(self, img):
         id_ = len(self.reqs_ids)
@@ -143,7 +136,7 @@ class Regressor:
         for rect in detections:
             cropped_img = self.crop(frame, rect[:4])
             out = self.net.forward(cropped_img)
-            out = self.__decode_detections(out[0], rect)
+            out = self.__decode_detections(out, rect)
             outputs.append(out)
         return outputs
 
@@ -171,9 +164,9 @@ class Regressor:
 
 
 class Track:
-    def __init__(self, id, box, kps, time, align_kp=False):
-        self.id = id
-        self.boxes = [box]
+    def __init__(self, ID, bbox, kps, time, align_kp=False):
+        self.id = ID
+        self.boxes = [bbox]
         self.kps = [kps]
         self.timestamps = [time]
         self.no_updated_frames = 0
@@ -233,7 +226,7 @@ class Track:
 
     def _align_kp_positions(self):
         # store indexes for matching
-        indexes = {i:j for i,j in zip(range(9), range(9))}
+        indexes = dict(zip(range(9), range(9)))
         # list for marking vertexes
         ind_updated = [False for i in range(9)]
         for i in range(len(self.kps[-1])):
@@ -265,15 +258,15 @@ class Track:
                                       + filter_speed * self.boxes[-1][j])
             self.boxes[-1] = tuple(filtered_box)
 
-    def add_detection(self, box, kps, timestamp, max_skip_size=1,
+    def add_detection(self, bbox, kps, timestamp, max_skip_size=1,
                       box_filter_speed=0.7, kp_filter_speed=0.3,
                       add_treshold=0.1, no_updated_frames_treshold=5):
         skip_size = timestamp - self.get_end_time()
         if 1 < skip_size <= max_skip_size:
-            self._interpolate(box, kps, timestamp, skip_size)
+            self._interpolate(bbox, kps, timestamp, skip_size)
             assert self.get_end_time() == timestamp - 1
 
-        self.boxes.append(box)
+        self.boxes.append(bbox)
         self.kps.append(kps)
         self.timestamps.append(timestamp)
         self._filter_last_box(box_filter_speed)
@@ -290,7 +283,6 @@ class CameraTracker:
 
     def process(self, frames, all_detections, all_kps):
         self.sct.process(frames, all_detections, all_kps)
-        tracks = self.sct.get_tracks()
         self.time += 1
 
     def _get_next_global_id(self):
@@ -300,9 +292,9 @@ class CameraTracker:
 
         return self.global_ids_queue.get_nowait()
 
-    def _release_global_id(self, id):
-        assert id <= self.last_global_id
-        self.global_ids_queue.put(id)
+    def _release_global_id(self, ID):
+        assert ID <= self.last_global_id
+        self.global_ids_queue.put(ID)
 
     def get_tracked_objects(self):
         return self.sct.get_tracked_objects()
@@ -335,7 +327,7 @@ class SingleCameraTracker:
         self.track_clear_thresh = track_clear_thresh
         assert 0 <= match_threshold <= 1
         self.match_threshold = match_threshold
-        assert 0 <= max_bbox_velocity
+        assert max_bbox_velocity >= 0
         self.max_bbox_velocity = max_bbox_velocity
         assert 0 <= track_detection_iou_thresh <= 1
         self.track_detection_iou_thresh = track_detection_iou_thresh
@@ -437,8 +429,8 @@ class SingleCameraTracker:
                                          detections[i], kps[i], self.time))
 
     @staticmethod
-    def _area(box):
-        return max((box[2] - box[0]), 0) * max((box[3] - box[1]), 0)
+    def _area(bbox):
+        return max((bbox[2] - bbox[0]), 0) * max((bbox[3] - bbox[1]), 0)
 
     def _giou(self, b1, b2, a1=None, a2=None):
         if a1 is None:
