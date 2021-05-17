@@ -62,7 +62,7 @@ def load_ie_model(ie, model_xml, device, plugin_dir, cpu_extension='', num_reqs=
     net = ie.read_network(model_xml, os.path.splitext(model_xml)[0] + ".bin")
     log.info("Preparing input blobs")
     input_blob = next(iter(net.input_info))
-    out_blob = [key for key in net.outputs]
+    out_blob = net.outputs.keys()
     net.batch_size = 1
 
     # Loading model to the plugin
