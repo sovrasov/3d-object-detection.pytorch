@@ -5,7 +5,6 @@ import numpy as np
 import glog as log
 
 from openvino.inference_engine import IECore
-from icecream import ic
 
 from torchdet3d.utils import draw_kp, Regressor, Detector, OBJECTRON_CLASSES, CameraTracker
 

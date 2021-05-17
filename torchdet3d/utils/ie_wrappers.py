@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 import logging
 from tqdm import tqdm
 from scipy.optimize import linear_sum_assignment
-from icecream import ic
 
 from objectron.dataset import box
 
@@ -36,11 +35,7 @@ class IEModel:
     def forward(self, img):
         """Performs forward pass of the wrapped IE model"""
         res = self.net.infer(inputs={self.input_key: self._preprocess(img)})
-<<<<<<< HEAD
         return [res[key] for key in self.output_key]
-=======
-        return [res[key] for key in self.output_key],
->>>>>>> added tracking functionality to pipeline
 
     def forward_async(self, img):
         id_ = len(self.reqs_ids)
@@ -74,11 +69,7 @@ def load_ie_model(ie, model_xml, device, plugin_dir, cpu_extension='', num_reqs=
     net = ie.read_network(model_xml, os.path.splitext(model_xml)[0] + ".bin")
     log.info("Preparing input blobs")
     input_blob = next(iter(net.input_info))
-<<<<<<< HEAD
-    out_blob = net.outputs
-=======
     out_blob = [key for key in net.outputs]
->>>>>>> added tracking functionality to pipeline
     net.batch_size = 1
 
     # Loading model to the plugin
