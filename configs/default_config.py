@@ -12,8 +12,8 @@ data = dict(
 
 model = dict(name='mobilenetv3_large_21k', pretrained=True, num_classes=9)
 
-data_parallel = dict(use_parallel=False,
-                     parallel_params=dict(device_ids=[0], output_device=0))
+data_parallel = dict(use_parallel=True,
+                     parallel_params=dict(device_ids=[0,1], output_device=0))
 
 optim = dict(name='adam', lr=0.001, momentum=0.9, wd=1e-4, betas=(0.9, 0.999), rho=0.9, alpha=0.99, nesterov=True)
 
