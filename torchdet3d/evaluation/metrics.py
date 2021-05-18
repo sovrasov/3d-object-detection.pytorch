@@ -37,7 +37,7 @@ def compute_accuracy(pred_cats, gt_cats, reduce_mean=True, **kwargs):
     return torch.sum((pred_cats == gt_cats).float()).item()
 
 @torch.no_grad()
-def compute_metrics_per_cls(pred_kp, gt_kp, pred_cats, gt_cats, **kwargs):
+def compute_metrics_per_cls(pred_kp, gt_kp, pred_cats, gt_cats, compute_IOU, **kwargs):
     classes = torch.unique(gt_cats)
     computed_metrics = []
     total_ADD, total_SADD, total_IOU, total_acc = 0, 0, 0, 0
@@ -48,11 +48,15 @@ def compute_metrics_per_cls(pred_kp, gt_kp, pred_cats, gt_cats, **kwargs):
         ADD, SADD = compute_average_distance(class_pred_kp,
                                              class_gt_kp, reduce_mean=False,
                                              **kwargs)
-        IOU = compute_2d_based_iou(class_pred_kp,
-                                   class_gt_kp, reduce_mean=False)
         acc = compute_accuracy(pred_cats[gt_cats == cl],
                                gt_cats[gt_cats == cl], reduce_mean=False,
                                **kwargs)
+        if compute_IOU:
+            IOU = compute_2d_based_iou(class_pred_kp,
+                                    class_gt_kp, reduce_mean=False)
+        else:
+            IOU = 0
+
         num_class_samples = class_gt_kp.shape[0]
         computed_metrics.append((cl, ADD / num_class_samples, SADD / num_class_samples,
                                  IOU / num_class_samples, acc / num_class_samples))

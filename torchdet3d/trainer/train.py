@@ -4,7 +4,7 @@ import datetime
 from tqdm import tqdm
 from dataclasses import dataclass
 
-from torchdet3d.evaluation import compute_average_distance, compute_accuracy
+from torchdet3d.evaluation import compute_average_distance, compute_metrics_per_cls, compute_accuracy
 from torchdet3d.utils import AverageMeter, save_snap
 
 @dataclass(init=True)
@@ -24,6 +24,7 @@ class Trainer:
     save_freq: int = 10
     print_freq: int = 10
     train_step: int = 0
+    reweight_loss: bool = False
 
     def train(self, epoch):
         ''' procedure launching main training'''
@@ -44,8 +45,15 @@ class Trainer:
             imgs, gt_kp, gt_cats = self.put_on_device([imgs, gt_kp, gt_cats], self.device)
             # compute output and loss
             pred_kp, pred_cats = self.model(imgs, gt_cats)
+            if self.reweight_loss:
+                per_class_metric, *_ = compute_metrics_per_cls(pred_kp, gt_kp, pred_cats, gt_cats, compute_only='add')
+                # sort classes and get only add metric per class
+                per_class_metric.sort()
+                per_class_metric = [cls[1] for cls in per_class_metric]
+            else:
+                per_class_metric = None
             # get parsed loss
-            loss = self.loss_manager.parse_losses(pred_kp, gt_kp, pred_cats, gt_cats, it)
+            loss = self.loss_manager.parse_losses(pred_kp, gt_kp, pred_cats, gt_cats, it, per_class_metric)
             # compute gradient and do SGD step
             self.optimizer.zero_grad()
             loss.backward()

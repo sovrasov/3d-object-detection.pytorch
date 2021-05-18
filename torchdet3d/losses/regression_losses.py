@@ -2,6 +2,7 @@ import math
 
 import torch
 from torch.nn.modules.loss import _Loss
+import numpy as np
 
 __all__ = ['DiagLoss', 'ADD_loss', 'WingLoss', 'LossManager']
 
@@ -77,7 +78,7 @@ class LossManager:
         self.alwa_version = 'ver_1' if alwa.compute_std else 'ver_2'
 
     def parse_losses(self, pred_kp, gt_kp,
-                        pred_cats, gt_cats, iter_):
+                        pred_cats, gt_cats, iter_, per_class_metrics):
         class_loss = []
         regress_loss = []
         # compute losses
@@ -86,13 +87,32 @@ class LossManager:
                 class_loss.append(cr(pred_cats, gt_cats) * k)
         else:
             class_loss = torch.zeros(1, requires_grad=True)
-        for k, cr in zip(self.reg_coeffs, self.reg_criterions):
-            regress_loss.append(cr(pred_kp, gt_kp) * k)
+
+        if per_class_metrics is not None:
+            assert self.class_criterions
+            # per class metric is a list with computed add metric for each class
+            # these scalars will be coefficients for computing main loss
+            X = np.array(per_class_metrics)
+            alpha = (X - X.min()) / (X.max() - X.min())
+            main_reg_loss = []
+            for cls in range(len(per_class_metrics)):
+                class_gt_kp = gt_kp[gt_cats == cls]
+                class_pred_kp = pred_kp[gt_cats == cls]
+                main_reg_loss.append(self.reg_criterions[0](class_pred_kp, class_gt_kp) * alpha[cls])
+            main_reg_loss = sum(main_reg_loss)
+            regress_loss.append(main_reg_loss * self.reg_coeffs[0])
+            for i in range(1, len(self.reg_criterions)):
+                regress_loss.append(self.reg_criterions[i](pred_kp, gt_kp) * self.reg_coeffs[i])
+        else:
+            for k, cr in zip(self.reg_coeffs, self.reg_criterions):
+                regress_loss.append(cr(pred_kp, gt_kp) * k)
+        # sum all losses
         reg_loss = sum(regress_loss)
         cls_loss = sum(class_loss)
-        # compute alwa algo or just return sum of losses
         if not self.use_alwa:
             return sum(regress_loss) + sum(class_loss)
+
+        # compute alwa algo
         self.s_cls.append(self.lam_cls*cls_loss)
         self.s_reg.append(self.lam_reg*reg_loss)
         if iter_ % self.C == 0 and iter_ != 0:
@@ -110,6 +130,6 @@ class LossManager:
                 reg = reg_mean
             if cls > reg:
                 self.lam_cls = (1 - (cls - reg)/cls).item()
-                print(f"classification coefficient changed : {self.lam_cls}")
+                print(f"classification coefficient changed to: {self.lam_cls}")
 
-        return self.lam_reg * sum(regress_loss) + self.lam_cls * sum(class_loss)
+        return self.lam_reg * reg_loss + self.lam_cls * cls_loss

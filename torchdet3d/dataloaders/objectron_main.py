@@ -9,7 +9,7 @@ import numpy as np
 from icecream import ic
 import albumentations as A
 
-from torchdet3d.utils import draw_kp, ToTensor, ConvertColor, unnormalize_img, OBJECTRON_CLASSES
+from torchdet3d.utils import draw_kp, ToTensor, ConvertColor, unnormalize_img, OBJECTRON_CLASSES, RandomRotate
 
 class Objectron(Dataset):
     def __init__(self, root_folder, mode='train', transform=None, debug_mode=False, name='0', category_list='all'):
@@ -179,24 +179,22 @@ def test():
                         ConvertColor(),
                         A.Resize(*(224,224)),
                         A.HorizontalFlip(p=0.3),
+                        RandomRotate(angle_limit=20, p=0.4),
                         A.OneOf([
                                     A.HueSaturationValue(p=0.3),
                                     A.RGBShift(p=0.3),
                                     A.RandomBrightnessContrast(p=0.3),
-                                    A.CLAHE(p=0.3),
                                     A.ColorJitter(p=0.3),
                                 ], p=1),
-                        A.Blur(blur_limit=5, p=0.3),
-                        A.Posterize(p=0.3),
-                        A.IAAPiecewiseAffine(p=0.3),
+                        A.Blur(blur_limit=5, p=0.15),
                         normalize,
                         ToTensor((224,224))
                         ], keypoint_params=A.KeypointParams(format='xy', remove_invisible=False))
     for index in np.random.randint(0,60000,20):
         super_vision_test(root, mode='val', transform=train_transform, index=index)
-    dataset_test(root, mode='val', transform=train_transform, batch_size=256)
-    dataset_test(root, mode='train', transform=train_transform, batch_size=256)
-    cat_filter_test(root, mode='val', transform=train_transform, category_list=['shoe', 'camera', 'bottle', 'bike'])
+    # dataset_test(root, mode='val', transform=train_transform, batch_size=256)
+    # dataset_test(root, mode='train', transform=train_transform, batch_size=256)
+    # cat_filter_test(root, mode='val', transform=train_transform, category_list=['shoe', 'camera', 'bottle', 'bike'])
 
 if __name__ == '__main__':
     test()
