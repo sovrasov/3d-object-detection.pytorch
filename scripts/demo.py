@@ -4,21 +4,24 @@ import cv2 as cv
 import numpy as np
 import glog as log
 from openvino.inference_engine import IECore
+from dataclasses import dataclass, asdict
 
-from torchdet3d.utils import draw_kp, Regressor, Detector, OBJECTRON_CLASSES, CameraTracker
+from torchdet3d.utils import draw_kp, Regressor, Detector, OBJECTRON_CLASSES, IOUTracker
 
+@dataclass
 class SctConfig:
-    params = dict(time_window=10,
-                  continue_time_thresh=5,
-                  track_clear_thresh=3000,
-                  match_threshold=0.4,
-                  max_bbox_velocity=0.2,
-                  track_detection_iou_thresh=0.5,
-                  interpolate_time_thresh=10,
-                  detection_filter_speed=0.7,
-                  keypoints_filter_speed=0.3,
-                  add_treshold=.1,
-                  no_updated_frames_treshold=5)
+    time_window : int = 10
+    continue_time_thresh : int = 5
+    track_clear_thresh : int = 3000
+    match_threshold : float = 0.4
+    max_bbox_velocity : float = 0.2
+    track_detection_iou_thresh : float = 0.5
+    interpolate_time_thresh : float = 10
+    detection_filter_speed : float = 0.7
+    keypoints_filter_speed : float = 0.3
+    add_treshold : float = .1
+    no_updated_frames_treshold : int = 5
+    align_kp : bool = False
 
 
 def draw_detections(frame, reg_detections, det_detections, ids, reg_only=True):
@@ -51,7 +54,7 @@ def run(params, capture, detector, regressor, sct_config, write_video=False, res
         vout = cv.VideoWriter()
         vout.open('output_video_demo.mp4',fourcc,fps,resolution,True)
     win_name = '3D-object-detection'
-    tracker =  CameraTracker(sct_config)
+    tracker =  IOUTracker(sct_config)
     has_frame, prev_frame = capture.read()
     prev_frame = cv.resize(prev_frame, resolution)
     if not has_frame:
@@ -120,7 +123,7 @@ def main():
     object_detector = Detector(ie, args.od_model, args.det_tresh, args.device, args.cpu_extension)
     regressor = Regressor(ie, args.reg_model, args.device, args.cpu_extension)
     # running demo
-    run(args, cap, object_detector, regressor, sct_config.params, args.write_video, tuple(args.resolution))
+    run(args, cap, object_detector, regressor, asdict(sct_config), args.write_video, tuple(args.resolution))
 
 if __name__ == '__main__':
     main()
