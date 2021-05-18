@@ -76,9 +76,10 @@ class Track:
 
     def _align_kp_positions(self):
         # store indexes for matching
-        indexes = list(range(self.kps[-1].shape[0]))
+        num_keypoints = self.kps[-1].shape[0]
+        indexes = list(range())
         # list for marking vertexes
-        ind_updated = [False for i in range(9)]
+        ind_updated = [False for i in range(num_keypoints)]
         for i in range(len(self.kps[-1])):
             if ind_updated[i]:
                 continue
@@ -129,7 +130,6 @@ class IOUTracker:
                  continue_time_thresh=2,
                  track_clear_thresh=3000,
                  match_threshold=0.4,
-                 max_bbox_velocity=0.2,
                  track_detection_iou_thresh=0.5,
                  interpolate_time_thresh=10,
                  detection_filter_speed=0.7,
@@ -151,8 +151,6 @@ class IOUTracker:
         self.track_clear_thresh = track_clear_thresh
         assert 0 <= match_threshold <= 1
         self.match_threshold = match_threshold
-        assert max_bbox_velocity >= 0
-        self.max_bbox_velocity = max_bbox_velocity
         assert 0 <= track_detection_iou_thresh <= 1
         self.track_detection_iou_thresh = track_detection_iou_thresh
         assert interpolate_time_thresh >= 0

@@ -14,7 +14,6 @@ class IOUTrackerConfig:
     continue_time_thresh : int = 5
     track_clear_thresh : int = 3000
     match_threshold : float = 0.4
-    max_bbox_velocity : float = 0.2
     track_detection_iou_thresh : float = 0.5
     interpolate_time_thresh : float = 10
     detection_filter_speed : float = 0.7
