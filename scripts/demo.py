@@ -9,7 +9,7 @@ from dataclasses import dataclass, asdict
 from torchdet3d.utils import draw_kp, Regressor, Detector, OBJECTRON_CLASSES, IOUTracker
 
 @dataclass
-class SctConfig:
+class IOUTrackerConfig:
     time_window : int = 10
     continue_time_thresh : int = 5
     track_clear_thresh : int = 3000
@@ -54,7 +54,7 @@ def run(params, capture, detector, regressor, sct_config, write_video=False, res
         vout = cv.VideoWriter()
         vout.open('output_video_demo.mp4',fourcc,fps,resolution,True)
     win_name = '3D-object-detection'
-    tracker =  IOUTracker(sct_config)
+    tracker =  IOUTracker(**sct_config)
     has_frame, prev_frame = capture.read()
     prev_frame = cv.resize(prev_frame, resolution)
     if not has_frame:
@@ -107,7 +107,7 @@ def main():
     parser.add_argument('--write_video', action='store_true',
                         help='whether to save a demo video or not')
     args = parser.parse_args()
-    sct_config = SctConfig()
+    sct_config = IOUTrackerConfig()
     if args.cam_id >= 0:
         log.info('Reading from cam {}'.format(args.cam_id))
         cap = cv.VideoCapture(args.cam_id)

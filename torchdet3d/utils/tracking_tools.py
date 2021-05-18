@@ -76,7 +76,7 @@ class Track:
 
     def _align_kp_positions(self):
         # store indexes for matching
-        indexes = dict(zip(range(9), range(9)))
+        indexes = list(range(self.kps[-1].shape[0]))
         # list for marking vertexes
         ind_updated = [False for i in range(9)]
         for i in range(len(self.kps[-1])):
@@ -124,34 +124,7 @@ class Track:
 
 
 class IOUTracker:
-    def __init__(self, sct_params):
-        self.time = 0
-        self.last_global_id = 0
-        self.global_ids_queue = queue.Queue()
-        self.sct = SingleCameraTracker(self._get_next_global_id,
-                                            self._release_global_id, **sct_params)
-
-    def process(self, frames, all_detections, all_kps):
-        self.sct.process(frames, all_detections, all_kps)
-        self.time += 1
-
-    def _get_next_global_id(self):
-        if self.global_ids_queue.empty():
-            self.global_ids_queue.put(self.last_global_id)
-            self.last_global_id += 1
-
-        return self.global_ids_queue.get_nowait()
-
-    def _release_global_id(self, ID):
-        assert ID <= self.last_global_id
-        self.global_ids_queue.put(ID)
-
-    def get_tracked_objects(self):
-        return self.sct.get_tracked_objects()
-
-
-class SingleCameraTracker:
-    def __init__(self, global_id_getter, global_id_releaser,
+    def __init__(self,
                  time_window=5,
                  continue_time_thresh=2,
                  track_clear_thresh=3000,
@@ -165,8 +138,8 @@ class SingleCameraTracker:
                  no_updated_frames_treshold=5,
                  align_kp=False):
 
-        self.global_id_getter = global_id_getter
-        self.global_id_releaser = global_id_releaser
+        self.last_global_id = 0
+        self.global_ids_queue = queue.Queue()
         self.tracks = []
         self.history_tracks = []
         self.time = 0
@@ -276,6 +249,17 @@ class SingleCameraTracker:
             if j is None:
                 self.tracks.append(Track(self.global_id_getter(),
                                          detections[i], kps[i], self.time, self.align_kp))
+
+    def global_id_getter(self):
+        if self.global_ids_queue.empty():
+            self.global_ids_queue.put(self.last_global_id)
+            self.last_global_id += 1
+
+        return self.global_ids_queue.get_nowait()
+
+    def global_id_releaser(self, ID):
+        assert ID <= self.last_global_id
+        self.global_ids_queue.put(ID)
 
     @staticmethod
     def _area(bbox):
