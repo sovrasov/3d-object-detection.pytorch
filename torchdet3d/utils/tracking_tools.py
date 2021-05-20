@@ -77,9 +77,9 @@ class Track:
     def _align_kp_positions(self):
         # store indexes for matching
         num_keypoints = self.kps[-1].shape[0]
-        indexes = list(range())
+        indexes = list(range(num_keypoints))
         # list for marking vertexes
-        ind_updated = [False for i in range(num_keypoints)]
+        ind_updated = [False] * num_keypoints
         for i in range(len(self.kps[-1])):
             if ind_updated[i]:
                 continue
