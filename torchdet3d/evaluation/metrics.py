@@ -48,8 +48,9 @@ def compute_metrics_per_cls(pred_kp, gt_kp, pred_cats, gt_cats, **kwargs):
         ADD, SADD = compute_average_distance(class_pred_kp,
                                              class_gt_kp, reduce_mean=False,
                                              **kwargs)
-        IOU = compute_2d_based_iou(class_pred_kp,
-                                   class_gt_kp, reduce_mean=False)
+        IOU = 0.
+        #compute_2d_based_iou(class_pred_kp,
+        #                           class_gt_kp, reduce_mean=False)
         acc = compute_accuracy(pred_cats[gt_cats == cl],
                                gt_cats[gt_cats == cl], reduce_mean=False,
                                **kwargs)
