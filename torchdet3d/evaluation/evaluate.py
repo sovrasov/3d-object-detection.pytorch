@@ -70,8 +70,9 @@ class Evaluator:
                     normalized=False,
                     label=label)
     @torch.no_grad()
-    def val(self, epoch=None):
+    def val(self, epoch=None, compute_iou=True):
         ''' procedure launching main validation '''
+        print(compute_iou)
         ADD_meter = AverageMeter()
         SADD_meter = AverageMeter()
         ACC_meter = AverageMeter()
@@ -90,7 +91,8 @@ class Evaluator:
             # compute output and loss
             pred_kp, pred_cats = self.model(imgs, gt_cats)
             # measure metrics
-            per_class_metrics, ADD, SADD, IOU, ACC = compute_metrics_per_cls(pred_kp, gt_kp, pred_cats, gt_cats)
+            per_class_metrics, ADD, SADD, IOU, ACC = compute_metrics_per_cls(pred_kp, gt_kp, pred_cats,
+                                                                             gt_cats, compute_iou)
             for cl, ADD_cls, SADD_cls, IOU_cls, ACC_cls in per_class_metrics:
                 ADD_cls_meter[cl].update(ADD_cls, imgs.size(0))
                 SADD_cls_meter[cl].update(SADD_cls, imgs.size(0))
@@ -116,22 +118,27 @@ class Evaluator:
             self.writer.add_scalar('Val/ADD', ADD_meter.avg, global_step=epoch)
             self.writer.add_scalar('Val/SADD', SADD_meter.avg, global_step=epoch)
             self.writer.add_scalar('Val/ACC', ACC_meter.avg, global_step=epoch)
-            self.writer.add_scalar('Val/IOU', IOU_meter.avg, global_step=epoch)
+            if compute_iou:
+                self.writer.add_scalar('Val/IOU', IOU_meter.avg, global_step=epoch)
 
-        t = PrettyTable(['category name', 'ADD', 'SADD', 'IOU', 'accuracy'], float_format=".4")
-        t.add_row(["Average metrics",
+        table_header = ['category name', 'ADD', 'SADD', 'accuracy']
+        if compute_iou: table_header.append('IOU')
+        t = PrettyTable(table_header, float_format=".4")
+        avg_row = ["Average metrics",
                     ADD_meter.avg,
                     SADD_meter.avg,
-                    IOU_meter.avg,
-                    ACC_meter.avg])
+                    ACC_meter.avg]
+        if compute_iou: avg_row.append(IOU_meter.avg)
+        t.add_row(avg_row)
 
         for cls_ in range(self.num_classes):
             cl_str = OBJECTRON_CLASSES[cls_]
-            t.add_row([cl_str,
+            cls_row = [cl_str,
                        ADD_cls_meter[cls_].avg,
                        SADD_cls_meter[cls_].avg,
-                       IOU_cls_meter[cls_].avg,
-                       ACC_cls_meter[cls_].avg])
+                       ACC_cls_meter[cls_].avg]
+            if compute_iou: cls_row.append(IOU_cls_meter[cls_].avg)
+            t.add_row(cls_row)
 
         ep_mess = f"epoch: {epoch}\n" if epoch is not None else ""
         print("\nComputed val metrics:\n"
@@ -141,7 +148,7 @@ class Evaluator:
     def run_eval_pipe(self, visual_only=False):
         print('.'*10,'Run evaluating protocol', '.'*10)
         if not visual_only:
-            self.val()
+            self.val(compute_iou=True)
         self.visual_test()
 
     @staticmethod

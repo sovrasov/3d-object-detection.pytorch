@@ -25,7 +25,7 @@ class Trainer:
     print_freq: int = 10
     train_step: int = 0
 
-    def train(self, epoch):
+    def train(self, epoch, is_last_epoch):
         ''' procedure launching main training'''
 
         losses = AverageMeter()
@@ -107,7 +107,7 @@ class Trainer:
             if (self.debug and it == self.debug_steps):
                 break
 
-        if self.save_chkpt and epoch % self.save_freq == 0 and not self.debug:
+        if self.save_chkpt and (epoch % self.save_freq == 0 or is_last_epoch) and not self.debug:
             save_snap(self.model, self.optimizer, self.scheduler, epoch, self.log_path)
         # do scheduler step
         if self.scheduler is not None:
