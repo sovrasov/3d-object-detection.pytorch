@@ -6,7 +6,8 @@ from tqdm import tqdm
 from copy import deepcopy
 
 from .metrics import compute_accuracy, compute_average_distance, compute_metrics_per_cls
-from torchdet3d.utils import (AverageMeter, mkdir_if_missing, draw_kp, OBJECTRON_CLASSES)
+from torchdet3d.utils import (AverageMeter, mkdir_if_missing, draw_kp,
+                              OBJECTRON_CLASSES, put_on_device)
 from torchdet3d.builders import build_augmentations
 from torchdet3d.dataloaders import Objectron
 
@@ -48,7 +49,7 @@ class Evaluator:
                     f'{self.path_to_save_imgs}/tested_image_№_{idx}_true.jpg',
                     RGB=False,
                     normalized=False)
-            img, gt_kp = self.put_on_device([img, gt_kp], self.device)
+            img, gt_kp = put_on_device([img, gt_kp], self.device)
             # feed forward net
             pred_kp, pred_cat = self.model(torch.unsqueeze(img,0), torch.tensor(gt_cat).view(1,-1))
             # compute metrics for given sampled image
@@ -72,7 +73,6 @@ class Evaluator:
     @torch.no_grad()
     def val(self, epoch=None, compute_iou=True):
         ''' procedure launching main validation '''
-        print(compute_iou)
         ADD_meter = AverageMeter()
         SADD_meter = AverageMeter()
         ACC_meter = AverageMeter()
@@ -87,7 +87,7 @@ class Evaluator:
         loop = tqdm(enumerate(self.val_loader), total=len(self.val_loader), leave=False)
         for it, (imgs, gt_kp, gt_cats) in loop:
             # put image and keypoints on the appropriate device
-            imgs, gt_kp, gt_cats = self.put_on_device([imgs, gt_kp, gt_cats], self.device)
+            imgs, gt_kp, gt_cats = put_on_device([imgs, gt_kp, gt_cats], self.device)
             # compute output and loss
             pred_kp, pred_cats = self.model(imgs, gt_cats)
             # measure metrics
@@ -150,12 +150,6 @@ class Evaluator:
         if not visual_only:
             self.val(compute_iou=True)
         self.visual_test()
-
-    @staticmethod
-    def put_on_device(items, device):
-        for i, item in enumerate(items):
-            items[i] = item.to(device)
-        return items
 
     @staticmethod
     def transform_kp(kp: np.array, crop_cords: tuple):

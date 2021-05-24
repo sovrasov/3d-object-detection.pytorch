@@ -239,6 +239,11 @@ def normalize(image_shape, unnormalized_keypoints):
     keypoints = unnormalized_keypoints / np.asarray([w, h], np.float32)
     return keypoints
 
+def put_on_device(items, device):
+    for i, item in enumerate(items):
+        items[i] = item.to(device)
+    return items
+
 def draw_kp(img, keypoints, name=None, normalized=True, RGB=True, num_keypoints=9, label=None):
     '''
     img: numpy three dimensional array

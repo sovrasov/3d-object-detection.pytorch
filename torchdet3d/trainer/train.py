@@ -5,7 +5,7 @@ from tqdm import tqdm
 from dataclasses import dataclass
 
 from torchdet3d.evaluation import compute_average_distance, compute_accuracy
-from torchdet3d.utils import AverageMeter, save_snap
+from torchdet3d.utils import AverageMeter, save_snap, put_on_device
 
 @dataclass(init=True)
 class Trainer:
@@ -41,7 +41,7 @@ class Trainer:
         loop = tqdm(enumerate(self.train_loader), total=self.num_iters, leave=False)
         for it, (imgs, gt_kp, gt_cats) in loop:
             # put image and keypoints on the appropriate device
-            imgs, gt_kp, gt_cats = self.put_on_device([imgs, gt_kp, gt_cats], self.device)
+            imgs, gt_kp, gt_cats = put_on_device([imgs, gt_kp, gt_cats], self.device)
             # compute output and loss
             pred_kp, pred_cats = self.model(imgs, gt_cats)
             # get parsed loss
@@ -112,9 +112,3 @@ class Trainer:
         # do scheduler step
         if self.scheduler is not None:
             self.scheduler.step()
-
-    @staticmethod
-    def put_on_device(items, device):
-        for i, item in enumerate(items):
-            items[i] = item.to(device)
-        return items

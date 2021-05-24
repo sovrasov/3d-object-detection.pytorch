@@ -50,7 +50,7 @@ def compute_metrics_per_cls(pred_kp, gt_kp, pred_cats, gt_cats, compute_iou=True
                                              **kwargs)
         if compute_iou:
             IOU = compute_2d_based_iou(class_pred_kp,
-                                    class_gt_kp, reduce_mean=False)
+                                       class_gt_kp, reduce_mean=False)
         else:
             IOU = 0.
         acc = compute_accuracy(pred_cats[gt_cats == cl],
