@@ -122,13 +122,15 @@ class Evaluator:
                 self.writer.add_scalar('Val/IOU', IOU_meter.avg, global_step=epoch)
 
         table_header = ['category name', 'ADD', 'SADD', 'accuracy']
-        if compute_iou: table_header.append('IOU')
+        if compute_iou:
+            table_header.append('IOU')
         t = PrettyTable(table_header, float_format=".4")
         avg_row = ["Average metrics",
                     ADD_meter.avg,
                     SADD_meter.avg,
                     ACC_meter.avg]
-        if compute_iou: avg_row.append(IOU_meter.avg)
+        if compute_iou:
+            avg_row.append(IOU_meter.avg)
         t.add_row(avg_row)
 
         for cls_ in range(self.num_classes):
@@ -137,7 +139,8 @@ class Evaluator:
                        ADD_cls_meter[cls_].avg,
                        SADD_cls_meter[cls_].avg,
                        ACC_cls_meter[cls_].avg]
-            if compute_iou: cls_row.append(IOU_cls_meter[cls_].avg)
+            if compute_iou:
+                cls_row.append(IOU_cls_meter[cls_].avg)
             t.add_row(cls_row)
 
         ep_mess = f"epoch: {epoch}\n" if epoch is not None else ""
