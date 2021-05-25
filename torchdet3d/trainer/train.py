@@ -5,7 +5,7 @@ from tqdm import tqdm
 from dataclasses import dataclass
 
 from torchdet3d.evaluation import compute_average_distance, compute_accuracy
-from torchdet3d.utils import AverageMeter, save_snap
+from torchdet3d.utils import AverageMeter, save_snap, put_on_device
 
 @dataclass(init=True)
 class Trainer:
@@ -25,7 +25,7 @@ class Trainer:
     print_freq: int = 10
     train_step: int = 0
 
-    def train(self, epoch):
+    def train(self, epoch, is_last_epoch):
         ''' procedure launching main training'''
 
         losses = AverageMeter()
@@ -41,7 +41,7 @@ class Trainer:
         loop = tqdm(enumerate(self.train_loader), total=self.num_iters, leave=False)
         for it, (imgs, gt_kp, gt_cats) in loop:
             # put image and keypoints on the appropriate device
-            imgs, gt_kp, gt_cats = self.put_on_device([imgs, gt_kp, gt_cats], self.device)
+            imgs, gt_kp, gt_cats = put_on_device([imgs, gt_kp, gt_cats], self.device)
             # compute output and loss
             pred_kp, pred_cats = self.model(imgs, gt_cats)
             # get parsed loss
@@ -107,14 +107,8 @@ class Trainer:
             if (self.debug and it == self.debug_steps):
                 break
 
-        if self.save_chkpt and epoch % self.save_freq == 0 and not self.debug:
+        if self.save_chkpt and (epoch % self.save_freq == 0 or is_last_epoch) and not self.debug:
             save_snap(self.model, self.optimizer, self.scheduler, epoch, self.log_path)
         # do scheduler step
         if self.scheduler is not None:
             self.scheduler.step()
-
-    @staticmethod
-    def put_on_device(items, device):
-        for i, item in enumerate(items):
-            items[i] = item.to(device)
-        return items
