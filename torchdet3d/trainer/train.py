@@ -51,7 +51,7 @@ class Trainer:
             loss.backward()
             self.optimizer.step()
             # measure metrics
-            ADD, SADD = compute_average_distance(pred_kp, gt_kp)
+            ADD, SADD = 0, 0 #compute_average_distance(pred_kp, gt_kp)
             acc = compute_accuracy(pred_cats, gt_cats)
             # record loss
             losses.update(loss.item(), imgs.size(0))

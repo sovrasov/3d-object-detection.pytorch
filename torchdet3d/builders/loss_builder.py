@@ -1,7 +1,8 @@
 import torch
-from torchdet3d.losses import DiagLoss, ADD_loss, WingLoss
+from torchdet3d.losses import DiagLoss, ADD_loss, WingLoss, build_prtr_loss
 
-AVAILABLE_LOSS = ['smoothl1', 'l1', 'cross_entropy', 'diag_loss', 'mse', 'add_loss', 'wing']
+AVAILABLE_LOSS = ['smoothl1', 'l1', 'cross_entropy', 'diag_loss', 'mse', 'add_loss', 'wing',
+                  'prtr_loss']
 
 
 def build_loss(cfg):
@@ -24,5 +25,7 @@ def build_loss(cfg):
             regress_criterions.append(ADD_loss())
         elif loss_name == 'diag_loss':
             regress_criterions.append(DiagLoss())
+        elif loss_name == 'prtr_loss':
+            regress_criterions.append(build_prtr_loss(9, cfg.data.resize))
 
     return regress_criterions, class_criterions
