@@ -15,7 +15,8 @@ model = dict(name='mobilenetv3_large_21k', pretrained=True, num_classes=9)
 data_parallel = dict(use_parallel=True,
                      parallel_params=dict(device_ids=[0,1], output_device=0))
 
-optim = dict(name='adam', lr=0.001, momentum=0.9, wd=1e-4, betas=(0.9, 0.999), rho=0.9, alpha=0.99, nesterov=True)
+optim = dict(name='adam', lr=0.001, momentum=0.9, wd=1e-4, betas=(0.9, 0.999), rho=0.9, alpha=0.99, nesterov=True,
+             no_bias_decay=False)
 
 scheduler = dict(name='multistepLR', gamma=0.6, exp_gamma=0.975, steps=[60, 90, 120])
 
