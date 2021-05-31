@@ -146,6 +146,7 @@ class MobilenetV3Backbone(nn.Module):
         else:
             self.num_channels = [1280]
         self.body = mobilenetv3_large_100(pretrained)
+        self.body.classifier = None
 
     def forward(self, x):
         y = self.body.forward_features(x)
