@@ -13,6 +13,7 @@ class Trainer:
     train_loader: object
     optimizer: object
     scheduler: object
+    postprocessor: object
     loss_manager: object
     writer: object
     max_epoch : int
@@ -51,7 +52,8 @@ class Trainer:
             loss.backward()
             self.optimizer.step()
             # measure metrics
-            ADD, SADD = 0, 0 #compute_average_distance(pred_kp, gt_kp)
+            pred_kp = self.postprocessor(pred_kp, gt_kp)
+            ADD, SADD = compute_average_distance(pred_kp, gt_kp)
             acc = compute_accuracy(pred_cats, gt_cats)
             # record loss
             losses.update(loss.item(), imgs.size(0))

@@ -15,6 +15,7 @@ from torchdet3d.dataloaders import Objectron
 @dataclass
 class Evaluator:
     model: object
+    postprocessor: object
     val_loader: object
     test_loader: object
     cfg: dict
@@ -52,6 +53,7 @@ class Evaluator:
             img, gt_kp = put_on_device([img, gt_kp], self.device)
             # feed forward net
             pred_kp, pred_cat = self.model(torch.unsqueeze(img,0), torch.tensor(gt_cat).view(1,-1))
+            pred_kp = self.postprocessor(pred_kp, gt_kp)
             # compute metrics for given sampled image
             ADD, SADD = compute_average_distance(pred_kp, torch.unsqueeze(gt_kp, 0))
             accuracy = compute_accuracy(pred_cat, gt_cat)

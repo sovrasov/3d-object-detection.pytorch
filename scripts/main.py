@@ -8,7 +8,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 
 from torchdet3d.builders import (build_loader, build_model, build_loss,
-                                    build_optimizer, build_scheduler)
+                                 build_optimizer, build_scheduler, build_postprocessor)
 from torchdet3d.evaluation import Evaluator
 from torchdet3d.losses import LossManager
 from torchdet3d.trainer import Trainer
@@ -48,6 +48,7 @@ def main():
 
     optimizer = build_optimizer(cfg, net)
     scheduler = build_scheduler(cfg, optimizer)
+    postprocessor = build_postprocessor(cfg)
 
     if cfg.model.resume:
         if check_isfile(cfg.model.resume):
@@ -69,6 +70,7 @@ def main():
                       train_loader=train_loader,
                       optimizer=optimizer,
                       scheduler=scheduler,
+                      postprocessor=postprocessor,
                       loss_manager=loss_manager,
                       writer=writer,
                       max_epoch=cfg.data.max_epochs,
@@ -82,6 +84,7 @@ def main():
                       train_step=train_step)
 
     evaluator = Evaluator(model=net,
+                          postprocessor=postprocessor,
                           val_loader=val_loader,
                           test_loader=test_loader,
                           cfg=cfg,

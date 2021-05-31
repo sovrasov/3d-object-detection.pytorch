@@ -178,7 +178,7 @@ class SetCriterion(nn.Module):
         assert loss in loss_map, f'do you really want to compute {loss} loss?'
         return loss_map[loss](outputs, targets, indices, **kwargs)
 
-    def forward(self, outputs, targets, target_weights):
+    def forward(self, outputs, targets, target_weights, predictions_only=False):
         """ This performs the loss computation.
         Parameters:
              outputs: dict of tensors, see the output specification of the model for the format
@@ -193,6 +193,8 @@ class SetCriterion(nn.Module):
         idx = self._get_tgt_permutation_idx(indices)
         src_kpts = outputs['pred_coords'][idx]
         pred = (src_kpts.view(-1, self.num_classes, 2) * target_weights).detach()
+        if predictions_only:
+            return pred
 
         # Compute all the requested losses
         losses = {}
@@ -232,6 +234,11 @@ class PRTRLossWrapper(nn.Module):
         loss = sum(loss_dict[k] * weight_dict[k]
                     for k in loss_dict.keys() if k in weight_dict)
         return loss
+
+    def get_val_predictions(self, outputs, target):
+        target_weight = torch.ones((target.shape[0], self.num_points, 1)).to(target.device)
+        predictions = self.set_criterion(outputs, target, target_weight, predictions_only=True)
+        return predictions
 
 
 def build_prtr_loss(num_points=9, img_size=(224, 224)):
