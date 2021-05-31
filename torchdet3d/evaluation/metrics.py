@@ -41,7 +41,7 @@ def compute_metrics_per_cls(pred_kp, gt_kp, pred_cats, gt_cats, compute_iou=True
     classes = torch.unique(gt_cats)
     computed_metrics = []
     total_ADD, total_SADD, total_IOU, total_acc = 0, 0, 0, 0
-    batch_size = pred_kp.shape[0]
+    batch_size = gt_kp.shape[0]
     for cl in classes:
         class_gt_kp = gt_kp[gt_cats == cl]
         class_pred_kp = pred_kp[gt_cats == cl]

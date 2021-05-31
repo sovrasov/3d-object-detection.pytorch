@@ -53,6 +53,31 @@ def build_matcher(num_joints, cost_class=1.0, cost_coord=5.0):
     return HungarianMatcher(num_joints, cost_class=cost_class, cost_coord=cost_coord)
 
 
+def get_final_preds_match(outputs):
+    pred_logits = outputs['pred_logits'].detach()
+    pred_coords = outputs['pred_coords'].detach()
+
+    num_joints = pred_logits.shape[-1] - 1
+
+    # exclude background logit
+    prob = F.softmax(pred_logits[..., :-1], dim=-1)
+
+    score_holder = []
+    orig_coord = []
+    for b, C in enumerate(prob):
+        # Cost Matrix: [num_joints, N]
+        _, query_ind = linear_sum_assignment(-C.cpu().numpy().transpose(0, 1))
+        score = prob[b, query_ind, list(np.arange(num_joints))][..., None]
+        pred_raw = pred_coords[b, query_ind]
+        orig_coord.append(pred_raw)
+        score_holder.append(score)
+
+    matched_score = torch.stack(score_holder)
+    matched_coord = torch.stack(orig_coord)
+
+    return matched_coord, matched_score
+
+
 class SetCriterion(nn.Module):
     """ This class computes the loss for DETR.
     The process happens in two steps:

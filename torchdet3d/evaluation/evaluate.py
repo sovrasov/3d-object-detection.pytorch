@@ -92,6 +92,7 @@ class Evaluator:
             imgs, gt_kp, gt_cats = put_on_device([imgs, gt_kp, gt_cats], self.device)
             # compute output and loss
             pred_kp, pred_cats = self.model(imgs, gt_cats)
+            pred_kp = self.postprocessor(pred_kp, gt_kp)
             # measure metrics
             per_class_metrics, ADD, SADD, IOU, ACC = compute_metrics_per_cls(pred_kp, gt_kp, pred_cats,
                                                                              gt_cats, compute_iou)
