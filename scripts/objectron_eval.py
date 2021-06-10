@@ -50,7 +50,7 @@ class Torchdet3dEvaluator(Evaluator):
         self.regression_model = regression_model
         self.correct_class_index = correct_class_index
 
-    def predict(self, images, batch_size):
+    def predict(self, images, batch_size, gt_boxes=None):
         """
         Implement your own function/model to predict the box's 2D and 3D
         keypoint from the input images.
@@ -63,13 +63,30 @@ class Torchdet3dEvaluator(Evaluator):
         """
         all_boxes = []
         images = ((images + 1) * 127.5).astype(np.uint8)
+        gt_boxes = None
         for i in range(batch_size):
-            self.detection_model.run_async(images[i])
-            detections = self.detection_model.wait_and_grab()
-            outputs = self.regression_model.get_detections(
-                images[i], detections)
-            # vis = draw_detections(images[i], outputs, detections, reg_only=False)
-            # cv.imwrite('eval.png', vis)
+            if gt_boxes:
+                frame_boxes = gt_boxes[i]['2d_instance']
+                h, w = images[i].shape[0], images[i].shape[1]
+                detections = []
+                for j in range(len(frame_boxes)):
+                    min_x = np.min(frame_boxes[j][:,0] * w)
+                    min_y = np.min(frame_boxes[j][:,1] * h)
+                    max_x = np.max(frame_boxes[j][:,0] * w)
+                    max_y = np.max(frame_boxes[j][:,1] * h)
+
+                    min_x, min_y = max(0, min_x), max(0, min_y)
+                    max_x, max_y = min(w - 1, max_x), min(h - 1, max_y)
+
+                    det = ((int(min_x), int(min_y), int(max_x), int(max_y)), 1., 0.)
+                    detections.append(det)
+            else:
+                self.detection_model.run_async(images[i])
+                detections = self.detection_model.wait_and_grab()
+
+            outputs = self.regression_model.get_detections(images[i], detections)
+            vis = draw_detections(images[i], outputs, detections, reg_only=False)
+            cv.imwrite('eval.png', vis)
             # cv.imshow('eval.png', vis)
             # cv.waitKey()
             boxes = []
@@ -95,7 +112,7 @@ class Torchdet3dEvaluator(Evaluator):
             planes.append(plane)
 
         #pred = self.model.predict(np.asarray(images), batch_size=len(batch))
-        results = self.predict(np.asarray(images), batch_size=len(batch))
+        results = self.predict(np.asarray(images), batch_size=len(batch), gt_boxes=labels)
 
         # Creating some fake results for testing as well as example of what the
         # the results should look like.
