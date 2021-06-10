@@ -3,6 +3,7 @@ import datetime
 
 from tqdm import tqdm
 from dataclasses import dataclass
+import torch
 
 from torchdet3d.evaluation import compute_average_distance, compute_accuracy
 from torchdet3d.utils import AverageMeter, save_snap, put_on_device
@@ -34,6 +35,7 @@ class Trainer:
         SADD_meter = AverageMeter()
         ACC_meter = AverageMeter()
         batch_time = AverageMeter()
+        max_norm = 0.1
 
         # switch to train mode and train one epoch
         self.model.train()
@@ -50,6 +52,8 @@ class Trainer:
             # compute gradient and do SGD step
             self.optimizer.zero_grad()
             loss.backward()
+            if max_norm > 0:
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm)
             self.optimizer.step()
             # measure metrics
             pred_kp = self.postprocessor(pred_kp, gt_kp)

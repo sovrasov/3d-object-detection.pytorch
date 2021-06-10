@@ -178,7 +178,7 @@ class SetCriterion(nn.Module):
 
         loss_bbox = F.l1_loss(src_kpts, target_kpts, reduction='none') * weights
 
-        losses = {'loss_kpts': loss_bbox.mean() * self.num_classes}
+        losses = {'loss_kpts': loss_bbox.mean()} #* self.num_classes}
 
         return losses
 

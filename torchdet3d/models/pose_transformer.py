@@ -154,8 +154,8 @@ class MobilenetV3Backbone(nn.Module):
 
 
 def get_mobilenetv3_pose_net(num_classes=9, pretrained=False, num_points=9, export_mode=False):
-    hd = 256
-    transformer = build_transformer(hidden_dim=hd, dropout=0.0, nheads=8, dim_feedforward=2048,
+    hd = 128
+    transformer = build_transformer(hidden_dim=hd, dropout=0.0, nheads=8, dim_feedforward=1280,
                                     enc_layers=6, dec_layers=6, pre_norm=False)
     n_steps = hd // 2
     position_embedding = PositionEmbeddingSine(n_steps, normalize=True)
