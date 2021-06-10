@@ -23,7 +23,7 @@ import objectron.dataset.metrics as metrics
 def draw_detections(frame, reg_detections, det_detections, reg_only=True):
     """Draws detections and labels"""
     for det_out, reg_out in zip(det_detections, reg_detections):
-        left, top, right, bottom = det_out[0]
+        left, top, right, bottom = det_out[:4]
         kp = reg_out[0]
         label = reg_out[1]
         label = OBJECTRON_CLASSES[label]
@@ -63,7 +63,6 @@ class Torchdet3dEvaluator(Evaluator):
         """
         all_boxes = []
         images = ((images + 1) * 127.5).astype(np.uint8)
-        gt_boxes = None
         for i in range(batch_size):
             if gt_boxes:
                 frame_boxes = gt_boxes[i]['2d_instance']
@@ -78,19 +77,20 @@ class Torchdet3dEvaluator(Evaluator):
                     min_x, min_y = max(0, min_x), max(0, min_y)
                     max_x, max_y = min(w - 1, max_x), min(h - 1, max_y)
 
-                    det = ((int(min_x), int(min_y), int(max_x), int(max_y)), 1., 0.)
+                    det = (int(min_x), int(min_y), int(max_x), int(max_y), 1., 0.)
                     detections.append(det)
             else:
                 self.detection_model.run_async(images[i])
                 detections = self.detection_model.wait_and_grab()
 
-            outputs = self.regression_model.get_detections(images[i], detections)
-            vis = draw_detections(images[i], outputs, detections, reg_only=False)
-            cv.imwrite('eval.png', vis)
+            outputs = self.regression_model.get_detections(images[i], detections, crop_coords=True)
+            # vis = draw_detections(images[i], outputs, detections, reg_only=False)
+            # cv.imwrite('eval.png', vis)
             # cv.imshow('eval.png', vis)
             # cv.waitKey()
             boxes = []
             for kps, label in outputs:
+                kps = kps[0]
                 kps[:, 0] /= images[i].shape[1]
                 kps[:, 1] /= images[i].shape[0]
                 kps_3d = lift_2d([kps], portrait=True)[0]
@@ -98,7 +98,7 @@ class Torchdet3dEvaluator(Evaluator):
             all_boxes.append(boxes)
         return all_boxes
 
-    def evaluate(self, batch):
+    def evaluate(self, batch, use_gt_boxes=False):
         """Evaluates a batch of serialized tf.Example protos."""
         images, labels, projs, planes = [], [], [], []
         for serialized in batch:
@@ -111,8 +111,8 @@ class Torchdet3dEvaluator(Evaluator):
             plane = self.encoder.parse_plane(example)
             planes.append(plane)
 
-        #pred = self.model.predict(np.asarray(images), batch_size=len(batch))
-        results = self.predict(np.asarray(images), batch_size=len(batch), gt_boxes=labels)
+        results = self.predict(np.asarray(images), batch_size=len(batch),
+                               gt_boxes=(labels if use_gt_boxes else None))
 
         # Creating some fake results for testing as well as example of what the
         # the results should look like.
@@ -270,6 +270,7 @@ def main():
                         help='Max number of examples to evaluate.')
     parser.add_argument('--report_file_prefix', type=str, default='', required=True,
                         help='Path of the report file to write.')
+    parser.add_argument('--use_gt_boxes', action='store_true')
     args = parser.parse_args()
 
     if args.obj_classes[0] == 'all':

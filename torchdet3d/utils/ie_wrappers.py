@@ -125,20 +125,22 @@ class Regressor:
     def __init__(self, ie,  model_path, device='CPU', ext_path=''):
         self.net = load_ie_model(ie, model_path, device, None, ext_path)
 
-    def get_detections(self, frame, detections):
+    def get_detections(self, frame, detections, crop_coords=False):
         """Returns all detections on frame"""
         outputs = []
         for rect in detections:
             cropped_img = self.crop(frame, rect[:4])
             out = self.net.forward(cropped_img)
-            out = self.__decode_detections(out, rect)
+            out = self.__decode_detections(out, rect, crop_coords)
             outputs.append(out)
         return outputs
 
-    def __decode_detections(self, out, rect):
+    def __decode_detections(self, out, rect, crop_coords=False):
         """Decodes raw regression model output"""
         label = np.argmax(out[0])
         kp = out[1][label]
+        if crop_coords:
+            kp = self.transform_kp(kp[0], rect[:4])
         return (kp, label)
 
     @staticmethod
@@ -149,7 +151,7 @@ class Regressor:
         kp[:,1] = kp[:,1]*crop_shape[1]
         kp[:,0] += x0
         kp[:,1] += y0
-        return kp
+        return [kp]
 
     @staticmethod
     def crop(frame, rect):
