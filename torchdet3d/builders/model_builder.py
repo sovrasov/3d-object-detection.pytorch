@@ -8,12 +8,12 @@ from efficientnet_lite1_pytorch_model import EfficientnetLite1ModelFile
 from efficientnet_lite2_pytorch_model import EfficientnetLite2ModelFile
 
 from torchdet3d.models import (MobileNetV3, init_pretrained_weights,
-                               model_params, MobileNetV3_large_100_timm)
+                               model_params, MobileNetV3_large_100_timm, T2T_ViT_12)
 from torchdet3d.utils import load_pretrained_weights
 
 __AVAI_MODELS__ = {
                     'mobilenetv3_large', 'mobilenetv3_small', 'efficientnet-lite0', 'efficientnet-lite1',
-                    'efficientnet-lite2', 'mobilenetv3_large_21k',
+                    'efficientnet-lite2', 'mobilenetv3_large_21k', 't2t-vit-12',
                   }
 
 EFFICIENT_NET_WEIGHTS = {
@@ -61,6 +61,15 @@ def build_model(config, export_mode=False, weights_path=''):
 
     elif config.model.name == 'mobilenetv3_large_21k':
         model = model_wrapper(model_class=MobileNetV3_large_100_timm, output_channels=1280,
+                             num_classes=config.model.num_classes, export_mode=export_mode)
+
+        if config.model.load_weights:
+            load_pretrained_weights(model, config.model.load_weights)
+        elif config.model.pretrained and not export_mode:
+            init_pretrained_weights(model, key=config.model.name, extra_prefix='model.')
+
+    elif config.model.name == 't2t-vit-12':
+        model = model_wrapper(model_class=T2T_ViT_12, output_channels=256,
                              num_classes=config.model.num_classes, export_mode=export_mode)
 
         if config.model.load_weights:
@@ -126,7 +135,10 @@ def model_wrapper(model_class, output_channels, num_points=18,
         def forward(self, x, cats):
             ''' ordinary forward for training '''
             features = self.extract_features(x)
-            pooled_features = self._glob_feature_vector(features, mode=pooling_mode)
+            if len(features.shape) > 2:
+                pooled_features = self._glob_feature_vector(features, mode=pooling_mode)
+            else:
+                pooled_features = features
             if model_class is MobileNetV3:
                 pooled_features = self.classifier(pooled_features)
             # unique_cats = torch.unique(cats)

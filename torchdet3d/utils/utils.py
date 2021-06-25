@@ -147,6 +147,8 @@ def load_pretrained_weights(model, file_path='', pretrained_dict=None, extra_pre
 
     if 'state_dict' in checkpoint:
         state_dict = checkpoint['state_dict']
+    elif 'state_dict_ema' in checkpoint:
+        state_dict = checkpoint['state_dict_ema']
     else:
         state_dict = checkpoint
 
