@@ -17,6 +17,10 @@ pretrained_urls = {
     'https://miil-public-eu.oss-eu-central-1.aliyuncs.com/model-zoo/ImageNet_21K_P/models/mobilenetv3_large_100_miil_21k.pth',
     't2t-vit-12':
     'https://github.com/yitu-opensource/T2T-ViT/releases/download/main/76.5_T2T_ViT_12.pth.tar',
+    'levit-128s':
+    'https://dl.fbaipublicfiles.com/LeViT/LeViT-128S-96703c44.pth',
+    'levit-128':
+    'https://dl.fbaipublicfiles.com/LeViT/LeViT-128-b88c2750.pth',
 }
 
 model_params = dict(
