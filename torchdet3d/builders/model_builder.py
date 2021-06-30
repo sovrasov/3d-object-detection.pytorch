@@ -8,12 +8,14 @@ from efficientnet_lite1_pytorch_model import EfficientnetLite1ModelFile
 from efficientnet_lite2_pytorch_model import EfficientnetLite2ModelFile
 
 from torchdet3d.models import (MobileNetV3, init_pretrained_weights,
-                               model_params, MobileNetV3_large_100_timm, T2T_ViT_12, LeViT_128, LeViT_128S)
+                               model_params, MobileNetV3_large_100_timm, T2T_ViT_12,
+                               LeViT_128, LeViT_128S, PVT_V2_B0, PVT_V2_B1)
 from torchdet3d.utils import load_pretrained_weights
 
 __AVAI_MODELS__ = {
                     'mobilenetv3_large', 'mobilenetv3_small', 'efficientnet-lite0', 'efficientnet-lite1',
                     'efficientnet-lite2', 'mobilenetv3_large_21k', 't2t-vit-12', 'levit-128s', 'levit-128',
+                    'pvt_v2_b0', 'pvt_v2_b1',
                   }
 
 EFFICIENT_NET_WEIGHTS = {
@@ -88,6 +90,24 @@ def build_model(config, export_mode=False, weights_path=''):
 
     elif config.model.name == 'levit-128':
         model = model_wrapper(model_class=LeViT_128, output_channels=384,
+                             num_classes=config.model.num_classes, export_mode=export_mode)
+
+        if config.model.load_weights:
+            load_pretrained_weights(model, config.model.load_weights)
+        elif config.model.pretrained and not export_mode:
+            init_pretrained_weights(model, key=config.model.name, extra_prefix='model.')
+
+    elif config.model.name == 'pvt_v2_b0':
+        model = model_wrapper(model_class=PVT_V2_B0, output_channels=256,
+                             num_classes=config.model.num_classes, export_mode=export_mode)
+
+        if config.model.load_weights:
+            load_pretrained_weights(model, config.model.load_weights)
+        elif config.model.pretrained and not export_mode:
+            init_pretrained_weights(model, key=config.model.name, extra_prefix='model.')
+
+    elif config.model.name == 'pvt_v2_b1':
+        model = model_wrapper(model_class=PVT_V2_B1, output_channels=512,
                              num_classes=config.model.num_classes, export_mode=export_mode)
 
         if config.model.load_weights:

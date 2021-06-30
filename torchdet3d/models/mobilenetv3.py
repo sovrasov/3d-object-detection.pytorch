@@ -21,7 +21,12 @@ pretrained_urls = {
     'https://dl.fbaipublicfiles.com/LeViT/LeViT-128S-96703c44.pth',
     'levit-128':
     'https://dl.fbaipublicfiles.com/LeViT/LeViT-128-b88c2750.pth',
+    'pvt_v2_b0':
+    'https://drive.google.com/uc?export=download&id=1qnqChpm93vtXULeTuCT_0mJ2ZKIDc-Qo',
+    'pvt_v2_b1':
+    'https://drive.google.com/uc?export=download&id=1aM0KFE3f-qIpP3xfhihlULF0-NNuk1m7',
 }
+
 
 model_params = dict(
     mobilenetv3_large=dict(cfgs = [
